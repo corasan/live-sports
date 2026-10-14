@@ -1,13 +1,11 @@
 import { useVirtualizer } from '@tanstack/react-virtual'
-import { memo, useCallback, useLayoutEffect, useMemo, useRef } from 'react'
+import { memo, useCallback, useLayoutEffect, useRef } from 'react'
 import { useStore } from 'zustand'
-import { useShallow } from 'zustand/shallow'
 import type { GameEvent, Market, Severity } from '#/domain/event'
 import type { Game } from '#/domain/game'
-import type { GameId, TeamId } from '#/domain/ids'
-import { eventAt, gamesOf } from '#/feed/feed'
-import { at, size } from '#/feed/ring'
+import type { TeamId } from '#/domain/ids'
 import type { FeedStore } from '#/feed/store'
+import { selectFeedRows, type FeedQuery, type FeedRow } from '#/feed/view'
 import { PERIOD_PREFIX } from './Scoreboard'
 
 const ROW_HEIGHT = 44
@@ -51,13 +49,7 @@ function describeEvent(event: GameEvent, matchup: Matchup): string {
   }
 }
 
-function matchupsOf(store: FeedStore): ReadonlyMap<GameId, Matchup> {
-  return new Map(
-    gamesOf(store.getState()).map(({ id, league, home, away }) => [id, { league, home, away }]),
-  )
-}
-
-const FeedRow = memo(function FeedRow({ event, matchup }: { event: GameEvent; matchup: Matchup }) {
+const EventRow = memo(function EventRow({ event, game }: { event: GameEvent; game: Game }) {
   return (
     <div
       className={`flex h-full items-center gap-3 rounded border-l-4 px-3 text-sm whitespace-nowrap ${SEVERITY_STYLE[event.severity]}`}
@@ -66,57 +58,60 @@ const FeedRow = memo(function FeedRow({ event, matchup }: { event: GameEvent; ma
         {new Date(event.ts).toLocaleTimeString()}
       </time>
       <span className="text-xs text-slate-500">
-        {matchup.away.name} @ {matchup.home.name}
+        {game.away.name} @ {game.home.name}
       </span>
-      <span className="min-w-0 truncate">{describeEvent(event, matchup)}</span>
+      <span className="min-w-0 truncate">{describeEvent(event, game)}</span>
     </div>
   )
 })
 
-export function EventFeed({ store }: { store: FeedStore }) {
-  const log = useStore(
-    store,
-    useShallow(({ order, events }) => ({ order, events })),
+function FeedRowView({ row }: { row: FeedRow }) {
+  if (row.kind === 'event') return <EventRow event={row.event} game={row.game} />
+  return (
+    <h3 className="flex h-full items-end pb-1 text-sm font-semibold text-slate-700">{row.label}</h3>
   )
-  const matchups = useMemo(() => matchupsOf(store), [store])
+}
+
+export function EventFeed({ store, query }: { store: FeedStore; query: FeedQuery }) {
+  const rows = useStore(store, (feed) => selectFeedRows(feed, query))
   const scrollRef = useRef<HTMLDivElement>(null)
-  const getItemKey = useCallback((index: number) => at(log.order, index), [log.order])
+  const getItemKey = useCallback((index: number) => rows[index].key, [rows])
   const virtualizer = useVirtualizer({
-    count: size(log.order),
+    count: rows.length,
     getScrollElement: () => scrollRef.current,
     estimateSize: () => ROW_HEIGHT,
     getItemKey,
     overscan: OVERSCAN,
   })
 
-  const { written } = log.order
-  const previousWritten = useRef(written)
+  const previousRows = useRef(rows)
   useLayoutEffect(() => {
-    const prepended = written - previousWritten.current
-    previousWritten.current = written
+    const previous = previousRows.current
+    previousRows.current = rows
     const scrollTop = scrollRef.current?.scrollTop ?? 0
-    if (prepended > 0 && scrollTop > 0) {
-      virtualizer.scrollToOffset(scrollTop + prepended * ROW_HEIGHT)
+    if (previous === rows || scrollTop === 0) return
+    const top = Math.floor(scrollTop / ROW_HEIGHT)
+    const anchor = previous.at(top)
+    if (anchor === undefined) return
+    const index = rows.findIndex((row) => row.key === anchor.key)
+    if (index !== -1 && index !== top) {
+      virtualizer.scrollToOffset(scrollTop + (index - top) * ROW_HEIGHT)
     }
-  }, [written, virtualizer])
+  }, [rows, virtualizer])
 
+  if (rows.length === 0) return <p className="text-sm text-slate-500">No matching events</p>
   return (
     <div ref={scrollRef} className="h-[60vh] overflow-y-auto">
       <ol className="relative" style={{ height: virtualizer.getTotalSize() }}>
-        {virtualizer.getVirtualItems().map((item) => {
-          const event = eventAt(log, item.index)
-          const matchup = matchups.get(event.gameId)
-          if (matchup === undefined) return null
-          return (
-            <li
-              key={item.key}
-              className="absolute inset-x-0 top-0 pb-2"
-              style={{ height: ROW_HEIGHT, transform: `translateY(${item.start}px)` }}
-            >
-              <FeedRow event={event} matchup={matchup} />
-            </li>
-          )
-        })}
+        {virtualizer.getVirtualItems().map((item) => (
+          <li
+            key={item.key}
+            className="absolute inset-x-0 top-0 pb-2"
+            style={{ height: ROW_HEIGHT, transform: `translateY(${item.start}px)` }}
+          >
+            <FeedRowView row={rows[item.index]} />
+          </li>
+        ))}
       </ol>
     </div>
   )

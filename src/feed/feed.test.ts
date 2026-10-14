@@ -1,28 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import type { GameEvent } from '#/domain/event'
 import { applyEvent } from '#/domain/game'
-import { createSimulation, step } from '#/sim/simulation'
-import { createFeed, eventAt, gamesOf, ingest, type Feed } from './feed'
+import { createSimulation } from '#/sim/simulation'
+import { createFeed, eventAt, ingest, lookup, type Feed } from './feed'
+import { simulatedFeed } from './fixtures'
 import { size } from './ring'
 
-const TICK_MS = 1000
-
-function run(seed: number, ticks: number) {
-  const initial = createSimulation(seed)
-  let state = initial
-  const batches: GameEvent[][] = []
-  for (let i = 0; i < ticks; i++) {
-    const result = step(state, i * TICK_MS)
-    state = result.state
-    batches.push([...result.events])
-  }
-  return { initial: initial.games.map(({ game }) => game), final: state, batches }
-}
-
-function feedOf(seed: number, ticks: number, capacity: number) {
-  const { initial, final, batches } = run(seed, ticks)
-  const feed = batches.reduce(ingest, createFeed(initial, capacity))
-  return { initial, final, events: batches.flat(), feed }
+function gamesOf(feed: Feed) {
+  return feed.gameIds.map((id) => lookup(feed.games, id))
 }
 
 function feedEvents(feed: Feed): GameEvent[] {
@@ -37,7 +22,7 @@ function expectInSync(feed: Feed) {
 
 describe('ingest', () => {
   it('folds a real run into the same games as applying each event directly', () => {
-    const { initial, final, events, feed } = feedOf(7, 300, 20_000)
+    const { initial, final, events, feed } = simulatedFeed(7, 300, 20_000)
     const folded = initial.map((game) =>
       events.filter((event) => event.gameId === game.id).reduce(applyEvent, game),
     )
@@ -47,13 +32,13 @@ describe('ingest', () => {
   })
 
   it('keeps every event while under capacity', () => {
-    const { events, feed } = feedOf(11, 120, 20_000)
+    const { events, feed } = simulatedFeed(11, 120, 20_000)
     expectInSync(feed)
     expect(feedEvents(feed)).toEqual(events.toReversed())
   })
 
   it('evicts the oldest events past capacity and keeps byId and order in sync', () => {
-    const { events, feed } = feedOf(11, 120, 25)
+    const { events, feed } = simulatedFeed(11, 120, 25)
     expect(events.length).toBeGreaterThan(25)
     expectInSync(feed)
     expect(feedEvents(feed)).toEqual(events.slice(-25).toReversed())

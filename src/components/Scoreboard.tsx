@@ -1,8 +1,7 @@
 import { useStore } from 'zustand'
-import { useShallow } from 'zustand/shallow'
 import type { Game, League } from '#/domain/game'
-import { gamesOf } from '#/feed/feed'
 import type { FeedStore } from '#/feed/store'
+import { selectVisibleGames, type FeedQuery } from '#/feed/view'
 
 export const PERIOD_PREFIX: Readonly<Record<League, string>> = { NBA: 'Q', NFL: 'Q', NHL: 'P' }
 
@@ -21,8 +20,9 @@ function signed(value: number): string {
   return value > 0 ? `+${value}` : `${value}`
 }
 
-export function Scoreboard({ store }: { store: FeedStore }) {
-  const games = useStore(store, useShallow(gamesOf))
+export function Scoreboard({ store, query }: { store: FeedStore; query: FeedQuery }) {
+  const games = useStore(store, (feed) => selectVisibleGames(feed, query))
+  if (games.length === 0) return <p className="text-sm text-slate-500">No matching games</p>
   return (
     <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
       {games.map((game) => (

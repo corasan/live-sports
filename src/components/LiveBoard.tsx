@@ -1,10 +1,12 @@
 import { useStore } from 'zustand'
 import { size } from '#/feed/ring'
+import type { FeedQuery } from '#/feed/view'
 import { useSimulation } from '#/sim/useSimulation'
 import { EventFeed } from './EventFeed'
+import { FeedControls } from './FeedControls'
 import { Scoreboard } from './Scoreboard'
 
-export function LiveBoard({ seed }: { seed: number }) {
+export function LiveBoard({ seed, query }: { seed: number; query: FeedQuery }) {
   const { store, paused, togglePaused } = useSimulation(seed)
   const waiting = useStore(store, (feed) => size(feed.order) === 0)
   return (
@@ -22,13 +24,14 @@ export function LiveBoard({ seed }: { seed: number }) {
           </button>
         </div>
       </header>
-      <Scoreboard store={store} />
+      <FeedControls query={query} />
+      <Scoreboard store={store} query={query} />
       <section className="flex flex-col gap-2">
         <h2 className="text-lg font-semibold">Feed</h2>
         {waiting ? (
           <p className="text-sm text-slate-500">Waiting for tip-off…</p>
         ) : (
-          <EventFeed store={store} />
+          <EventFeed store={store} query={query} />
         )}
       </section>
     </main>
