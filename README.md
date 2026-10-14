@@ -27,8 +27,9 @@ Open http://localhost:3000. Add `?seed=<number>` to replay a specific simulation
 
 - `src/domain` holds the event model and game state. `GameEvent` is a discriminated union on `kind`, and every event carries `id`, `ts`, `gameId`, and `severity`. `applyEvent` is the only way a `Game` changes.
 - `src/sim` holds the simulator. `step(state, now)` is pure: it takes the previous state and a timestamp and returns the next state plus the events emitted that tick. League rules, scoring weights, and play weights live in data tables in `leagues.ts`.
-- `src/sim/useSimulation.ts` drives `step` on a one-second interval in the browser.
-- `src/components` renders the scoreboard and feed.
+- `src/feed` holds the client-side feed. `Feed` is normalized: games by id, events by id, and event ids in a ring buffer capped at 20,000. `ingest` folds a batch into games with `applyEvent` and evicts the oldest events. Each simulation gets its own zustand store.
+- `src/sim/useSimulation.ts` drives `step` on a one-second interval in the browser. Events are buffered for 350ms from the first one, then ingested on the next animation frame as one store update.
+- `src/components` renders the scoreboard and the latest 60 events, reading the store with selectors.
 
 ## Linting
 
