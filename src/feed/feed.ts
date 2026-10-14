@@ -41,7 +41,7 @@ export function gamesOf(feed: Feed): Game[] {
   return feed.gameIds.map((id) => lookup(feed.games, id))
 }
 
-export function eventAt(feed: Feed, index: number): GameEvent {
+export function eventAt(feed: Pick<Feed, 'events' | 'order'>, index: number): GameEvent {
   return lookup(feed.events, at(feed.order, index))
 }
 
