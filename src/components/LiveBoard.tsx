@@ -1,11 +1,12 @@
 import { useStore } from 'zustand'
+import { size } from '#/feed/ring'
 import { useSimulation } from '#/sim/useSimulation'
 import { EventFeed } from './EventFeed'
 import { Scoreboard } from './Scoreboard'
 
 export function LiveBoard({ seed }: { seed: number }) {
   const { store, paused, togglePaused } = useSimulation(seed)
-  const waiting = useStore(store, (feed) => feed.order.size === 0)
+  const waiting = useStore(store, (feed) => size(feed.order) === 0)
   return (
     <main className="mx-auto flex max-w-6xl flex-col gap-6 p-6">
       <header className="flex items-center justify-between">

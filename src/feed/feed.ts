@@ -1,7 +1,7 @@
 import type { GameEvent } from '#/domain/event'
 import { applyEvent, type Game } from '#/domain/game'
 import type { EventId, GameId } from '#/domain/ids'
-import { createRing, newest, push, type Ring } from './ring'
+import { at, createRing, push, type Ring } from './ring'
 
 export const FEED_CAPACITY = 20_000
 
@@ -41,8 +41,8 @@ export function gamesOf(feed: Feed): Game[] {
   return feed.gameIds.map((id) => lookup(feed.games, id))
 }
 
-export function latestEvents(feed: Feed, n: number): GameEvent[] {
-  return newest(feed.order, n).map((id) => lookup(feed.events, id))
+export function eventAt(feed: Feed, index: number): GameEvent {
+  return lookup(feed.events, at(feed.order, index))
 }
 
 function lookup<K, V>(map: ReadonlyMap<K, V>, key: K): V {

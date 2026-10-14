@@ -3,7 +3,8 @@ import { useShallow } from 'zustand/shallow'
 import type { GameEvent, Market, Severity } from '#/domain/event'
 import type { Game } from '#/domain/game'
 import type { TeamId } from '#/domain/ids'
-import { latestEvents } from '#/feed/feed'
+import { eventAt } from '#/feed/feed'
+import { size } from '#/feed/ring'
 import type { FeedStore } from '#/feed/store'
 import { PERIOD_PREFIX } from './Scoreboard'
 
@@ -47,7 +48,11 @@ function describeEvent(event: GameEvent, game: Game): string {
 export function EventFeed({ store }: { store: FeedStore }) {
   const events = useStore(
     store,
-    useShallow((feed) => latestEvents(feed, LOG_LIMIT)),
+    useShallow((feed) =>
+      Array.from({ length: Math.min(LOG_LIMIT, size(feed.order)) }, (_, index) =>
+        eventAt(feed, index),
+      ),
+    ),
   )
   const games = useStore(store, (feed) => feed.games)
   return (
