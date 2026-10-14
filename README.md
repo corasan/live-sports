@@ -4,24 +4,24 @@ A live sports scoreboard and event feed built with TanStack Start. All data come
 
 ## Run it
 
-Requires Node 22+ and pnpm (`corepack enable` picks up the pinned version).
+Requires [Bun](https://bun.sh) 1.4+ and Node 22+ (Vite and Vitest run on Node).
 
 ```bash
-pnpm install
-pnpm dev
+bun install
+bun dev
 ```
 
 Open http://localhost:3000. Add `?seed=<number>` to replay a specific simulation. The same seed always produces the same games and the same event sequence.
 
 ## Scripts
 
-| Command       | What it does                                   |
-| ------------- | ---------------------------------------------- |
-| `pnpm dev`    | Dev server on port 3000                        |
-| `pnpm test`   | Vitest suite                                   |
-| `pnpm check`  | oxfmt format check, oxlint, and `tsc --noEmit` |
-| `pnpm format` | Format with oxfmt                              |
-| `pnpm build`  | Production build                               |
+| Command          | What it does                                                  |
+| ---------------- | ------------------------------------------------------------- |
+| `bun run dev`    | Dev server on port 3000                                       |
+| `bun run test`   | Vitest suite (plain `bun test` runs Bun's own runner instead) |
+| `bun run check`  | oxfmt format check, oxlint, and `tsc --noEmit`                |
+| `bun run format` | Format with oxfmt                                             |
+| `bun run build`  | Production build                                              |
 
 ## Layout
 

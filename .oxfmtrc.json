@@ -4,7 +4,7 @@
   "singleQuote": true,
   "ignorePatterns": [
     "src/routeTree.gen.ts",
-    "pnpm-lock.yaml",
+    "bun.lock",
     ".agent/**",
     ".agents/**",
     ".claude/**",
