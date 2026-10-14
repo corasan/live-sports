@@ -1,7 +1,13 @@
+import { useStore } from 'zustand'
+import { useShallow } from 'zustand/shallow'
 import type { GameEvent, Market, Severity } from '#/domain/event'
 import type { Game } from '#/domain/game'
-import type { GameId, TeamId } from '#/domain/ids'
+import type { TeamId } from '#/domain/ids'
+import { latestEvents } from '#/feed/feed'
+import type { FeedStore } from '#/feed/store'
 import { PERIOD_PREFIX } from './Scoreboard'
+
+const LOG_LIMIT = 60
 
 const SEVERITY_STYLE: Readonly<Record<Severity, string>> = {
   info: 'border-slate-200 text-slate-600',
@@ -38,18 +44,16 @@ function describeEvent(event: GameEvent, game: Game): string {
   }
 }
 
-export function EventFeed({
-  events,
-  games,
-}: {
-  events: readonly GameEvent[]
-  games: readonly Game[]
-}) {
-  const gamesById = new Map<GameId, Game>(games.map((game) => [game.id, game]))
+export function EventFeed({ store }: { store: FeedStore }) {
+  const events = useStore(
+    store,
+    useShallow((feed) => latestEvents(feed, LOG_LIMIT)),
+  )
+  const games = useStore(store, (feed) => feed.games)
   return (
     <ol className="flex flex-col gap-2">
       {events.map((event) => {
-        const game = gamesById.get(event.gameId)
+        const game = games.get(event.gameId)
         if (game === undefined) return null
         return (
           <li

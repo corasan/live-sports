@@ -1,4 +1,8 @@
+import { useStore } from 'zustand'
+import { useShallow } from 'zustand/shallow'
 import type { Game, League } from '#/domain/game'
+import { gamesOf } from '#/feed/feed'
+import type { FeedStore } from '#/feed/store'
 
 export const PERIOD_PREFIX: Readonly<Record<League, string>> = { NBA: 'Q', NFL: 'Q', NHL: 'P' }
 
@@ -17,7 +21,8 @@ function signed(value: number): string {
   return value > 0 ? `+${value}` : `${value}`
 }
 
-export function Scoreboard({ games }: { games: readonly Game[] }) {
+export function Scoreboard({ store }: { store: FeedStore }) {
+  const games = useStore(store, useShallow(gamesOf))
   return (
     <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
       {games.map((game) => (

@@ -1,9 +1,11 @@
+import { useStore } from 'zustand'
 import { useSimulation } from '#/sim/useSimulation'
 import { EventFeed } from './EventFeed'
 import { Scoreboard } from './Scoreboard'
 
 export function LiveBoard({ seed }: { seed: number }) {
-  const { games, log, paused, togglePaused } = useSimulation(seed)
+  const { store, paused, togglePaused } = useSimulation(seed)
+  const waiting = useStore(store, (feed) => feed.order.size === 0)
   return (
     <main className="mx-auto flex max-w-6xl flex-col gap-6 p-6">
       <header className="flex items-center justify-between">
@@ -19,13 +21,13 @@ export function LiveBoard({ seed }: { seed: number }) {
           </button>
         </div>
       </header>
-      <Scoreboard games={games} />
+      <Scoreboard store={store} />
       <section className="flex flex-col gap-2">
         <h2 className="text-lg font-semibold">Feed</h2>
-        {log.length === 0 ? (
+        {waiting ? (
           <p className="text-sm text-slate-500">Waiting for tip-off…</p>
         ) : (
-          <EventFeed events={log} games={games} />
+          <EventFeed store={store} />
         )}
       </section>
     </main>

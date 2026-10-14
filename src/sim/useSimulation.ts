@@ -1,34 +1,35 @@
 import { useEffect, useState } from 'react'
-import type { GameEvent } from '#/domain/event'
-import { createSimulation, step, type SimState } from './simulation'
+import { ingest } from '#/feed/feed'
+import { createFeedStore } from '#/feed/store'
+import { createSimulation, step } from './simulation'
 
 const TICK_MS = 1000
-const LOG_LIMIT = 60
 
-type Feed = { readonly sim: SimState; readonly log: readonly GameEvent[] }
-
-function advance(feed: Feed, now: number): Feed {
-  const { state, events } = step(feed.sim, now)
-  return { sim: state, log: [...events.toReversed(), ...feed.log].slice(0, LOG_LIMIT) }
+function createLiveFeed(seed: number) {
+  let sim = createSimulation(seed)
+  const store = createFeedStore(sim.games.map(({ game }) => game))
+  return {
+    store,
+    tick: (now: number) => {
+      const { state, events } = step(sim, now)
+      sim = state
+      store.setState((feed) => ingest(feed, events), true)
+    },
+  }
 }
 
 export function useSimulation(seed: number) {
-  const [feed, setFeed] = useState<Feed>(() => ({ sim: createSimulation(seed), log: [] }))
+  const [live] = useState(() => createLiveFeed(seed))
   const [paused, setPaused] = useState(false)
 
   useEffect(() => {
     if (paused) return
-    const interval = setInterval(() => {
-      const now = Date.now()
-      setFeed((current) => advance(current, now))
-    }, TICK_MS)
+    const interval = setInterval(() => live.tick(Date.now()), TICK_MS)
     return () => clearInterval(interval)
-  }, [paused])
+  }, [live, paused])
 
   return {
-    seed,
-    games: feed.sim.games.map(({ game }) => game),
-    log: feed.log,
+    store: live.store,
     paused,
     togglePaused: () => setPaused((current) => !current),
   }
