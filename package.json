@@ -10,7 +10,11 @@
     "generate-routes": "tsr generate",
     "build": "vite build",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "lint": "oxlint --deny-warnings",
+    "format": "oxfmt",
+    "format:check": "oxfmt --check",
+    "check": "pnpm format:check && pnpm lint && pnpm typecheck"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.18",
@@ -29,11 +33,13 @@
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
     "@vitejs/plugin-react": "^6.0.1",
+    "oxfmt": "0.73.0",
+    "oxlint": "1.88.0",
     "typescript": "^6.0.2",
     "vite": "^8.0.0"
   },
-  "packageManager": "pnpm@12.5.1",
   "engines": {
     "node": ">=22"
-  }
+  },
+  "packageManager": "pnpm@12.5.1"
 }
