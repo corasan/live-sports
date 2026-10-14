@@ -27,6 +27,7 @@
     "tailwindcss": "^4.1.18"
   },
   "devDependencies": {
+    "@oxlint/plugins": "1.88.0",
     "@tanstack/devtools-vite": "0.8.5",
     "@tanstack/router-cli": "^1.132.0",
     "@types/node": "^22.10.2",

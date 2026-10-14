@@ -2,5 +2,20 @@
   "$schema": "./node_modules/oxfmt/configuration_schema.json",
   "semi": false,
   "singleQuote": true,
-  "ignorePatterns": ["src/routeTree.gen.ts", "pnpm-lock.yaml"]
+  "ignorePatterns": [
+    "src/routeTree.gen.ts",
+    "pnpm-lock.yaml",
+    ".agent/**",
+    ".agents/**",
+    ".claude/**",
+    ".codex/**",
+    ".continue/**",
+    ".cursor/**",
+    ".gemini/**",
+    ".opencode/**",
+    ".pi/**",
+    ".roo/**",
+    ".windsurf/**",
+    "tools/oxlint/anti-slop/**"
+  ]
 }
