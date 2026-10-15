@@ -1,4 +1,4 @@
-import type { Game } from './game'
+import type { Game, GameStatus } from './game'
 import type { EventId, GameId, TeamId } from './ids'
 
 export type Severity = 'info' | 'notable' | 'critical'
@@ -7,11 +7,35 @@ export type Score = { readonly home: number; readonly away: number }
 
 export type Market = 'moneyline' | 'spread' | 'total'
 
+export type Reason =
+  | 'routine'
+  | 'go_ahead'
+  | 'late_go_ahead'
+  | 'lead_change'
+  | 'late_lead_change'
+  | 'line_move'
+  | 'injury'
+  | 'final'
+
+export const REASON_SEVERITY: Readonly<Record<Reason, Severity>> = {
+  routine: 'info',
+  go_ahead: 'notable',
+  late_go_ahead: 'critical',
+  lead_change: 'notable',
+  late_lead_change: 'critical',
+  line_move: 'notable',
+  injury: 'notable',
+  final: 'notable',
+}
+
+export type Moment = GameStatus & { readonly score: Score }
+
 type EventBase = {
   readonly id: EventId
   readonly ts: number
   readonly gameId: GameId
-  readonly severity: Severity
+  readonly reason: Reason
+  readonly before: Moment
 }
 
 export type GameEvent = EventBase &
@@ -43,3 +67,7 @@ export type EventOf<K extends EventKind> = Extract<GameEvent, { kind: K }>
 type Draft<E extends GameEvent> = E extends GameEvent ? Omit<E, keyof EventBase> : never
 
 export type EventDraft = Draft<GameEvent>
+
+export function severityOf(event: GameEvent): Severity {
+  return REASON_SEVERITY[event.reason]
+}

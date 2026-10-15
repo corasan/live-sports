@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { GameEvent } from '#/domain/event'
+import { severityOf, type GameEvent } from '#/domain/event'
 import type { Game } from '#/domain/game'
 import { eventId, gameId, type EventId } from '#/domain/ids'
 import { ROSTERS } from '#/domain/roster'
@@ -108,7 +108,7 @@ describe('selectVisibleGames', () => {
 describe('selectFeedRows', () => {
   it('lists every event at or above the minimum severity, newest first, without headers', () => {
     const rows = selectFeedRows(feed, query({ severity: 'notable' }), null)
-    const expected = feedEvents(feed).filter((event) => event.severity !== 'info')
+    const expected = feedEvents(feed).filter((event) => severityOf(event) !== 'info')
     expect(expected.length).toBeGreaterThan(0)
     expect(rows.every((row) => row.kind === 'event')).toBe(true)
     expect(eventsOf(rows)).toEqual(expected)
@@ -420,7 +420,7 @@ describe('selectDetail', () => {
     const detail = found(feed, { kind: 'event', id: focused.id })
     expect(detail.game).toBe(feed.games.get(selected))
     expect(detail.timeline).toEqual(ofGame)
-    expect(detail.focus).toBe(focused.id)
+    expect(detail.focus).toBe(focused)
     expect(detail.recent).toContain(focused)
   })
 

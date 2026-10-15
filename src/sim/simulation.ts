@@ -1,10 +1,18 @@
 import type { EventDraft, GameEvent, Market } from '#/domain/event'
-import { applyEvent, leaderOf, LEAGUES, type Game, type League, type Odds } from '#/domain/game'
+import {
+  applyEvent,
+  leaderOf,
+  LEAGUES,
+  statusOf,
+  type Game,
+  type League,
+  type Odds,
+} from '#/domain/game'
 import { eventId, gameId, type GameId, type TeamId } from '#/domain/ids'
 import { LEAGUE_RULES, type LeagueRules, type MarketRules, type PlayKind } from './leagues'
 import { createRng, type Rng } from './rng'
 import { ROSTERS } from '#/domain/roster'
-import { severityOf } from './severity'
+import { reasonFor } from './reason'
 
 export type SimGame = {
   readonly game: Game
@@ -87,7 +95,8 @@ export function step(state: SimState, now: number): StepResult {
       id: eventId(nextSequence++),
       ts: now,
       gameId: game.id,
-      severity: severityOf(draft, game, rules),
+      reason: reasonFor(draft, game, rules),
+      before: { ...statusOf(game), score: game.score },
     }
     events.push(event)
     return event

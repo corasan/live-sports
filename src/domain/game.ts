@@ -29,6 +29,16 @@ export function matchupLabel(game: Pick<Game, 'home' | 'away'>): string {
   return `${game.away.name} @ ${game.home.name}`
 }
 
+export function statusOf(game: GameStatus): GameStatus {
+  switch (game.status) {
+    case 'live':
+      return { status: 'live', period: game.period }
+    case 'scheduled':
+    case 'final':
+      return { status: game.status }
+  }
+}
+
 export function leaderOf(game: Game, score: Score): TeamId | null {
   if (score.home === score.away) return null
   return score.home > score.away ? game.home.id : game.away.id

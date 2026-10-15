@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { GameEvent } from '#/domain/event'
-import { applyEvent, leaderOf, type Game } from '#/domain/game'
+import { applyEvent, leaderOf, statusOf, type Game } from '#/domain/game'
 import type { GameId, TeamId } from '#/domain/ids'
 import { createSimulation, step, type SimState } from './simulation'
 
@@ -99,6 +99,25 @@ describe.each(SEEDS)('a rolling slate with seed %i', (seed) => {
       )
       expect(emitted).toEqual(expected)
     }
+  })
+
+  it('records the game as it stood just before each event', () => {
+    for (const { start, events: stream } of streams.values()) {
+      stream.reduce((game, event) => {
+        expect(event.before).toEqual({ ...statusOf(game), score: game.score })
+        return applyEvent(game, event)
+      }, start)
+    }
+  })
+
+  it('records a score event against the score it changed and a start against a scheduled game', () => {
+    const scores = events.flatMap((event) => (event.kind === 'score' ? [event] : []))
+    const starts = events.flatMap((event) =>
+      event.kind === 'game_started' ? [event.before.status] : [],
+    )
+    expect(scores.length).toBeGreaterThan(0)
+    for (const event of scores) expect(event.before.score).not.toEqual(event.score)
+    expect(new Set(starts)).toEqual(new Set(['scheduled']))
   })
 
   it('emits nothing for a game after its game_ended', () => {

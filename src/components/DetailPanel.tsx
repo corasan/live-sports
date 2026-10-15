@@ -1,5 +1,5 @@
 import { useEffect, type ReactNode } from 'react'
-import type { GameEvent } from '#/domain/event'
+import { severityOf, type GameEvent } from '#/domain/event'
 import type { Game } from '#/domain/game'
 import type { EventId } from '#/domain/ids'
 import { describeEvent, eventTime, SEVERITY_DOT, SEVERITY_STYLE } from './describeEvent'
@@ -30,7 +30,7 @@ export function MiniTimeline({
         const mark =
           other.kind === 'period_ended'
             ? 'h-full w-0.5 bg-slate-400'
-            : `size-2.5 rounded-full ${SEVERITY_DOT[other.severity]}`
+            : `size-2.5 rounded-full ${SEVERITY_DOT[severityOf(other)]}`
         return (
           <button
             key={other.id}
@@ -75,7 +75,7 @@ export function EventList({
               type="button"
               aria-current={current || undefined}
               onClick={() => onSelect(event.id)}
-              className={`flex w-full cursor-pointer items-center gap-3 rounded px-3 py-2 text-left text-sm ${SEVERITY_STYLE[event.severity]} ${current ? SELECTED_STYLE : 'hover:brightness-95'}`}
+              className={`flex w-full cursor-pointer items-center gap-3 rounded px-3 py-2 text-left text-sm ${SEVERITY_STYLE[severityOf(event)]} ${current ? SELECTED_STYLE : 'hover:brightness-95'}`}
             >
               <time className="text-xs text-slate-400 tabular-nums">{eventTime(event)}</time>
               <span className="min-w-0 truncate">{describeEvent(event, game)}</span>
