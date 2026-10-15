@@ -20,6 +20,7 @@ export function MiniTimeline({
   game: Game
   onSelect: (id: EventId) => void
 }) {
+  if (timeline.length === 0) return null
   const first = timeline[0].ts
   const span = (timeline.at(-1)?.ts ?? first) - first
   const offset = (ts: number) => (span === 0 ? 50 : ((ts - first) / span) * 100)

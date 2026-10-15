@@ -50,9 +50,7 @@ export function GameDetailPanel({ store, selected }: { store: FeedStore; selecte
           </div>
         ))}
       </dl>
-      {timeline.length === 0 ? null : (
-        <MiniTimeline timeline={timeline} focus={null} game={game} onSelect={select} />
-      )}
+      <MiniTimeline timeline={timeline} focus={null} game={game} onSelect={select} />
       <RelatedList
         related={detail.recent}
         empty="No events in this game yet"
