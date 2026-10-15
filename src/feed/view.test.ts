@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import type { GameEvent } from '#/domain/event'
 import type { Game } from '#/domain/game'
-import { createFeed, eventAt, ingest, type Feed } from './feed'
-import { simulate, simulatedFeed } from './fixtures'
+import { createFeed, ingest, type Feed } from './feed'
+import { feedEvents, gamesOf, simulate, simulatedFeed } from './fixtures'
 import { size } from './ring'
 import {
   DEFAULT_QUERY,
@@ -25,14 +25,6 @@ function query(overrides: Partial<FeedQuery>): FeedQuery {
   return { ...DEFAULT_QUERY, ...overrides }
 }
 
-function scheduled(target: Feed): Game[] {
-  return target.gameIds.flatMap((id) => target.games.get(id) ?? [])
-}
-
-function history(target: Feed): GameEvent[] {
-  return Array.from({ length: size(target.order) }, (_, age) => eventAt(target, age))
-}
-
 function eventsOf(rows: readonly FeedRow[]): GameEvent[] {
   return rows.flatMap((row) => (row.kind === 'event' ? [row.event] : []))
 }
@@ -50,16 +42,16 @@ describe('selectVisibleGames', () => {
   it('keeps only games in the chosen league, in schedule order', () => {
     const games = selectVisibleGames(feed, query({ league: 'NHL' }))
     expect(games.length).toBeGreaterThan(0)
-    expect(games).toEqual(scheduled(feed).filter((game) => game.league === 'NHL'))
+    expect(games).toEqual(gamesOf(feed).filter((game) => game.league === 'NHL'))
   })
 
   it('matches team names case-insensitively, ignoring surrounding whitespace', () => {
-    const name = scheduled(feed)[0].home.name
+    const name = gamesOf(feed)[0].home.name
     const needle = name.slice(1, 5).toLowerCase()
     const games = selectVisibleGames(feed, query({ q: `  ${needle.toUpperCase()} ` }))
-    expect(games).toContain(scheduled(feed)[0])
+    expect(games).toContain(gamesOf(feed)[0])
     expect(games).toEqual(
-      scheduled(feed).filter((game) =>
+      gamesOf(feed).filter((game) =>
         `${game.home.name}|${game.away.name}`.toLowerCase().includes(needle),
       ),
     )
@@ -67,7 +59,7 @@ describe('selectVisibleGames', () => {
 
   it('sorts closest games by margin, then live before scheduled before final', () => {
     const games = selectVisibleGames(feed, query({ sort: 'closest' }))
-    expect(new Set(games)).toEqual(new Set(scheduled(feed)))
+    expect(new Set(games)).toEqual(new Set(gamesOf(feed)))
     expect(new Set(games.map(margin)).size).toBeGreaterThan(1)
     const position = new Map(feed.gameIds.map((id, index) => [id, index]))
     for (const [a, b] of games.slice(1).map((game, index) => [games[index], game] as const)) {
@@ -84,14 +76,14 @@ describe('selectVisibleGames', () => {
 describe('selectFeedRows', () => {
   it('lists every event at or above the minimum severity, newest first, without headers', () => {
     const rows = selectFeedRows(feed, query({ severity: 'notable' }))
-    const expected = history(feed).filter((event) => event.severity !== 'info')
+    const expected = feedEvents(feed).filter((event) => event.severity !== 'info')
     expect(expected.length).toBeGreaterThan(0)
     expect(rows.every((row) => row.kind === 'event')).toBe(true)
     expect(eventsOf(rows)).toEqual(expected)
   })
 
   it('heads each game section, orders sections by newest event, and keeps events newest-first', () => {
-    const age = new Map(history(feed).map((event, index) => [event.id, index]))
+    const age = new Map(feedEvents(feed).map((event, index) => [event.id, index]))
     const rows = selectFeedRows(feed, query({ group: 'game' }))
     expect(rows[0].kind).toBe('group')
     const groups = sections(rows)

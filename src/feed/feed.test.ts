@@ -1,18 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import type { GameEvent } from '#/domain/event'
 import { applyEvent } from '#/domain/game'
 import { createSimulation } from '#/sim/simulation'
-import { createFeed, eventAt, ingest, lookup, type Feed } from './feed'
-import { simulatedFeed } from './fixtures'
+import { createFeed, ingest, type Feed } from './feed'
+import { feedEvents, gamesOf, simulatedFeed } from './fixtures'
 import { size } from './ring'
-
-function gamesOf(feed: Feed) {
-  return feed.gameIds.map((id) => lookup(feed.games, id))
-}
-
-function feedEvents(feed: Feed): GameEvent[] {
-  return Array.from({ length: size(feed.order) }, (_, index) => eventAt(feed, index))
-}
 
 function expectInSync(feed: Feed) {
   const ids = feedEvents(feed).map((event) => event.id)

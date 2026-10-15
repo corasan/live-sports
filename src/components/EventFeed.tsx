@@ -2,7 +2,7 @@ import { useVirtualizer } from '@tanstack/react-virtual'
 import { memo, useCallback, useLayoutEffect, useRef } from 'react'
 import { useStore } from 'zustand'
 import type { GameEvent, Market, Severity } from '#/domain/event'
-import type { Game } from '#/domain/game'
+import { matchupLabel, type Game } from '#/domain/game'
 import type { TeamId } from '#/domain/ids'
 import type { FeedStore } from '#/feed/store'
 import { selectFeedRows, type FeedQuery, type FeedRow } from '#/feed/view'
@@ -49,7 +49,12 @@ function describeEvent(event: GameEvent, matchup: Matchup): string {
   }
 }
 
-const EventRow = memo(function EventRow({ event, game }: { event: GameEvent; game: Game }) {
+const EventRow = memo(function EventRow({
+  event,
+  league,
+  home,
+  away,
+}: { event: GameEvent } & Matchup) {
   return (
     <div
       className={`flex h-full items-center gap-3 rounded border-l-4 px-3 text-sm whitespace-nowrap ${SEVERITY_STYLE[event.severity]}`}
@@ -57,16 +62,17 @@ const EventRow = memo(function EventRow({ event, game }: { event: GameEvent; gam
       <time className="text-xs text-slate-400 tabular-nums">
         {new Date(event.ts).toLocaleTimeString()}
       </time>
-      <span className="text-xs text-slate-500">
-        {game.away.name} @ {game.home.name}
-      </span>
-      <span className="min-w-0 truncate">{describeEvent(event, game)}</span>
+      <span className="text-xs text-slate-500">{matchupLabel({ home, away })}</span>
+      <span className="min-w-0 truncate">{describeEvent(event, { league, home, away })}</span>
     </div>
   )
 })
 
 function FeedRowView({ row }: { row: FeedRow }) {
-  if (row.kind === 'event') return <EventRow event={row.event} game={row.game} />
+  if (row.kind === 'event') {
+    const { league, home, away } = row.game
+    return <EventRow event={row.event} league={league} home={home} away={away} />
+  }
   return (
     <h3 className="flex h-full items-end pb-1 text-sm font-semibold text-slate-700">{row.label}</h3>
   )
