@@ -4,7 +4,7 @@ import { parseEventId, parseGameId, type EventId, type GameId, type TeamId } fro
 import { ROSTER, ROSTERS } from '#/domain/roster'
 import { eventAt, lookup, type Feed } from './feed'
 import { memoizeLast } from './memo'
-import { size, type Ring } from './ring'
+import { at, size, type Ring } from './ring'
 
 export const SEVERITIES = ['info', 'notable', 'critical'] as const satisfies readonly Severity[]
 export const GAME_SORT_OPTIONS = ['schedule', 'closest', 'league'] as const
@@ -215,7 +215,7 @@ const feedRows = memoizeLast(
     const groupOf = GROUPINGS[group]
     const groups = new Map<string, FeedRow[]>()
     for (let age = 0; age < size(order); age++) {
-      const event = eventAt({ events, order }, age)
+      const event = lookup(events, at(order, age))
       if (!passes(event)) continue
       const game = lookup(games, event.gameId)
       const { key, label } = groupOf(game)
@@ -266,7 +266,7 @@ function gameEventsNewestFirst(
 ): GameEvent[] {
   const newestFirst: GameEvent[] = []
   for (let age = 0; age < size(order); age++) {
-    const event = eventAt({ events, order }, age)
+    const event = lookup(events, at(order, age))
     if (event.gameId === id) newestFirst.push(event)
   }
   return newestFirst
