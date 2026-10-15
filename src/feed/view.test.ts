@@ -3,14 +3,16 @@ import type { GameEvent } from '#/domain/event'
 import type { Game } from '#/domain/game'
 import { eventId, type EventId } from '#/domain/ids'
 import { createFeed, ingest, type Feed } from './feed'
-import { feedEvents, gamesOf, simulate, simulatedFeed } from './fixtures'
+import { feedEvents, gamesOf, ingestTicks, simulate, simulatedFeed, TICK_MS } from './fixtures'
 import { size } from './ring'
 import {
+  clearFilters,
   countNewEvents,
   DEFAULT_QUERY,
   parseFeedQuery,
   selectEventDetail,
   selectFeedRows,
+  selectFeedView,
   selectVisibleGames,
   stepSelection,
   type FeedQuery,
@@ -111,8 +113,8 @@ describe('selectFeedRows', () => {
 describe('countNewEvents', () => {
   const { initial, batches } = simulate(7, 120)
   const split = 30
-  const snapshot = batches.slice(0, split).reduce(ingest, createFeed(initial))
-  const live = batches.slice(split).reduce(ingest, snapshot)
+  const snapshot = ingestTicks(createFeed(initial), batches.slice(0, split))
+  const live = ingestTicks(snapshot, batches.slice(split))
 
   function newVisibleIds(q: FeedQuery): EventId[] {
     return eventsOf(selectFeedRows(live, q))
@@ -140,8 +142,8 @@ describe('countNewEvents', () => {
 
   it('caps at the ring capacity when more new events were written than it holds', () => {
     const capacity = 5
-    const small = batches.slice(0, split).reduce(ingest, createFeed(initial, capacity))
-    const overflowed = batches.slice(split).reduce(ingest, small)
+    const small = ingestTicks(createFeed(initial, capacity), batches.slice(0, split))
+    const overflowed = ingestTicks(small, batches.slice(split))
     expect(overflowed.order.written - small.order.written).toBeGreaterThan(capacity)
     expect(countNewEvents(overflowed, small, DEFAULT_QUERY)).toBe(capacity)
   })
@@ -150,8 +152,8 @@ describe('countNewEvents', () => {
 describe('memoization', () => {
   const { initial, batches } = simulate(7, 120)
   const latest = batches.findLastIndex((batch) => batch.length > 0)
-  const before = batches.slice(0, latest).reduce(ingest, createFeed(initial))
-  const after = ingest(before, batches[latest])
+  const before = ingestTicks(createFeed(initial), batches.slice(0, latest))
+  const after = ingest(before, batches[latest], latest * TICK_MS)
 
   it.each([
     ['selectVisibleGames', (target: Feed, q: FeedQuery) => selectVisibleGames(target, q)],
@@ -163,6 +165,49 @@ describe('memoization', () => {
     const ingested = select(after, base)
     expect(ingested).not.toBe(first)
     expect(select(after, query({ league: 'NHL' }))).not.toBe(ingested)
+  })
+})
+
+describe('selectFeedView', () => {
+  const { initial } = simulate(7, 1)
+
+  it('is loading until the first sync', () => {
+    expect(selectFeedView(createFeed(initial), DEFAULT_QUERY).kind).toBe('loading')
+  })
+
+  it('is empty once synced with no events in the ring', () => {
+    const synced = ingest(createFeed(initial), [], 0)
+    expect(selectFeedView(synced, DEFAULT_QUERY).kind).toBe('empty')
+  })
+
+  it('reports no matches when events exist but the filters exclude all of them', () => {
+    expect(size(feed.order)).toBeGreaterThan(0)
+    expect(selectFeedView(feed, query({ q: 'no team is called this' })).kind).toBe('no-matches')
+  })
+
+  it('lists the matching rows newest first', () => {
+    const view = selectFeedView(feed, DEFAULT_QUERY)
+    expect(view.kind === 'rows' && eventsOf(view.rows)).toEqual(feedEvents(feed))
+  })
+
+  it('returns the same view across repeated calls and heartbeats', () => {
+    const first = selectFeedView(feed, query({ league: 'NBA' }))
+    expect(first.kind).toBe('rows')
+    expect(selectFeedView(feed, query({ league: 'NBA' }))).toBe(first)
+    expect(selectFeedView(ingest(feed, [], Date.now()), query({ league: 'NBA' }))).toBe(first)
+  })
+})
+
+describe('clearFilters', () => {
+  it('resets league, severity, and search but keeps sort and grouping', () => {
+    const cleared = clearFilters({
+      league: 'NHL',
+      severity: 'critical',
+      q: 'hawks',
+      sort: 'closest',
+      group: 'game',
+    })
+    expect(cleared).toEqual({ ...DEFAULT_QUERY, sort: 'closest', group: 'game' })
   })
 })
 

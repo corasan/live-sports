@@ -5,6 +5,7 @@ import { EventDetailPanel } from './EventDetailPanel'
 import { EventFeed } from './EventFeed'
 import { BUTTON, FeedControls } from './FeedControls'
 import { Scoreboard } from './Scoreboard'
+import { StaleBanner } from './StaleBanner'
 
 export function LiveBoard({
   seed,
@@ -29,6 +30,7 @@ export function LiveBoard({
           </button>
         </div>
       </header>
+      <StaleBanner store={store} paused={paused} />
       <FeedControls query={query} />
       <Scoreboard store={store} query={query} />
       <div

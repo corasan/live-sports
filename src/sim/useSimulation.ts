@@ -10,15 +10,15 @@ const TICK_MS = 1000
 function createLiveFeed(seed: number) {
   let sim = createSimulation(seed)
   const store = createFeedStore(sim.games.map(({ game }) => game))
-  const batcher = createBatcher<GameEvent>((batch) =>
-    store.setState((feed) => ingest(feed, batch), true),
+  const batcher = createBatcher<readonly GameEvent[]>((ticks) =>
+    store.setState((feed) => ingest(feed, ticks.flat(), Date.now()), true),
   )
   return {
     store,
     tick: (now: number) => {
       const { state, events } = step(sim, now)
       sim = state
-      for (const event of events) batcher.push(event)
+      batcher.push(events)
     },
     dispose: batcher.dispose,
   }

@@ -261,3 +261,27 @@ const newEventCount = memoizeLast(
 export function countNewEvents(live: Feed, snapshot: Feed, query: FeedQuery): number {
   return newEventCount(live, snapshot.order.written, query.league, query.severity, query.q)
 }
+
+export type FeedView =
+  | { readonly kind: 'loading' }
+  | { readonly kind: 'empty' }
+  | { readonly kind: 'no-matches' }
+  | { readonly kind: 'rows'; readonly rows: readonly FeedRow[] }
+
+const LOADING: FeedView = { kind: 'loading' }
+const EMPTY: FeedView = { kind: 'empty' }
+const NO_MATCHES: FeedView = { kind: 'no-matches' }
+
+const rowsView = memoizeLast((rows: readonly FeedRow[]): FeedView => ({ kind: 'rows', rows }))
+
+export function selectFeedView(feed: Feed, query: FeedQuery): FeedView {
+  if (feed.syncedAt === null) return LOADING
+  if (size(feed.order) === 0) return EMPTY
+  const rows = selectFeedRows(feed, query)
+  return rows.length === 0 ? NO_MATCHES : rowsView(rows)
+}
+
+export function clearFilters(query: FeedQuery): FeedQuery {
+  const { league, severity, q } = DEFAULT_QUERY
+  return { ...query, league, severity, q }
+}
