@@ -1,5 +1,5 @@
 import type { FeedStore } from '#/feed/store'
-import type { FeedQuery, RelatedScope, Selection } from '#/feed/view'
+import { selectionSearch, type FeedQuery, type RelatedScope, type Selection } from '#/feed/view'
 import { useSimulation } from '#/sim/useSimulation'
 import { EventDetailPanel } from './EventDetailPanel'
 import { EventFeed } from './EventFeed'
@@ -22,6 +22,7 @@ export function LiveBoard({
   related: RelatedScope
 }) {
   const { store, paused, togglePaused, rate, setRate } = useSimulation(seed)
+  const selected = selectionSearch(selection)
   return (
     <main className="mx-auto flex max-w-6xl flex-col gap-6 p-6">
       <header className="flex flex-wrap items-center justify-between gap-3">
@@ -36,11 +37,7 @@ export function LiveBoard({
       </header>
       <StaleBanner store={store} paused={paused} />
       <FeedControls query={query} />
-      <Scoreboard
-        store={store}
-        query={query}
-        selected={selection?.kind === 'game' ? selection.id : undefined}
-      />
+      <Scoreboard store={store} query={query} selected={selected.game} />
       <div
         className={
           selection === undefined
@@ -48,11 +45,7 @@ export function LiveBoard({
             : 'grid gap-6 lg:grid-cols-[minmax(0,1fr)_24rem] lg:items-start'
         }
       >
-        <EventFeed
-          store={store}
-          query={query}
-          selected={selection?.kind === 'event' ? selection.id : undefined}
-        />
+        <EventFeed store={store} query={query} selected={selected.event} />
         {selection === undefined ? null : (
           <SelectionPanel store={store} selection={selection} related={related} />
         )}

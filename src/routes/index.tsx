@@ -28,7 +28,7 @@ export const Route = createFileRoute('/')({
         .map(([key, value]) => [key, String(value)]),
     )
     return {
-      seed: parseSeed(String(search.seed)),
+      seed: parseSeed(raw.seed ?? ''),
       ...parseFeedQuery({ ...raw, teams: search.teams }),
       ...selectionSearch(parseSelection(raw)),
       related: parseOption(RELATED_SCOPES, raw.related, DEFAULT_RELATED),
