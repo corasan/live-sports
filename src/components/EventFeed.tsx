@@ -12,7 +12,7 @@ import { useStore } from 'zustand'
 import type { GameEvent } from '#/domain/event'
 import { matchupLabel } from '#/domain/game'
 import type { EventId } from '#/domain/ids'
-import type { Feed } from '#/feed/feed'
+import type { Feed, Gap } from '#/feed/feed'
 import type { FeedStore } from '#/feed/store'
 import {
   clearFilters,
@@ -23,7 +23,7 @@ import {
   type FeedQuery,
   type FeedRow,
 } from '#/feed/view'
-import { describeEvent, eventTime, SEVERITY_STYLE, type Matchup } from './describeEvent'
+import { clockTime, describeEvent, eventTime, SEVERITY_STYLE, type Matchup } from './describeEvent'
 import { isPlainKeypress } from './keys'
 import { BUTTON, SELECTED_STYLE } from './styles'
 import { useSearchPatch, useSelect } from './useSearchPatch'
@@ -65,6 +65,22 @@ const EventRow = memo(function EventRow({
   )
 })
 
+function missedLabel(missed: number): string {
+  return missed === 1 ? '1 event missed' : `${missed} events missed`
+}
+
+function GapRow({ gap }: { gap: Gap }) {
+  return (
+    <p className="flex h-full items-center gap-3 text-xs text-slate-500">
+      <span className="flex-1 border-t border-dashed border-slate-300" />
+      <span className="tabular-nums">
+        Gap · {missedLabel(gap.missed)} · {clockTime(gap.from)}–{clockTime(gap.to)}
+      </span>
+      <span className="flex-1 border-t border-dashed border-slate-300" />
+    </p>
+  )
+}
+
 function FeedRowView({
   row,
   selected,
@@ -74,22 +90,29 @@ function FeedRowView({
   selected: EventId | undefined
   onSelect: (id: EventId) => void
 }) {
-  if (row.kind === 'event') {
-    const { league, home, away } = row.game
-    return (
-      <EventRow
-        event={row.event}
-        league={league}
-        home={home}
-        away={away}
-        selected={row.key === selected}
-        onSelect={onSelect}
-      />
-    )
+  switch (row.kind) {
+    case 'event': {
+      const { league, home, away } = row.game
+      return (
+        <EventRow
+          event={row.event}
+          league={league}
+          home={home}
+          away={away}
+          selected={row.key === selected}
+          onSelect={onSelect}
+        />
+      )
+    }
+    case 'gap':
+      return <GapRow gap={row.gap} />
+    case 'group':
+      return (
+        <h3 className="flex h-full items-end pb-1 text-sm font-semibold text-slate-700">
+          {row.label}
+        </h3>
+      )
   }
-  return (
-    <h3 className="flex h-full items-end pb-1 text-sm font-semibold text-slate-700">{row.label}</h3>
-  )
 }
 
 function FeedSkeleton() {

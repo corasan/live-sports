@@ -3,7 +3,7 @@ import type { GameEvent } from '#/domain/event'
 import type { Game } from '#/domain/game'
 import { eventId, gameId, type EventId, type TeamId } from '#/domain/ids'
 import { ROSTERS } from '#/domain/roster'
-import { createFeed, ingest, type Feed } from './feed'
+import { createFeed, ingest, receive, type Feed } from './feed'
 import { feedEvents, gamesOf, ingestTicks, simulate, simulatedFeed, TICK_MS } from './fixtures'
 import { size } from './ring'
 import {
@@ -49,7 +49,7 @@ function sections(rows: readonly FeedRow[]): { label: string; events: GameEvent[
   const result: { label: string; events: GameEvent[] }[] = []
   for (const row of rows) {
     if (row.kind === 'group') result.push({ label: row.label, events: [] })
-    else result[result.length - 1].events.push(row.event)
+    else if (row.kind === 'event') result[result.length - 1].events.push(row.event)
   }
   return result
 }
@@ -139,6 +139,88 @@ describe('selectFeedRows', () => {
     expect(ages.flat().toSorted((a, b) => a - b)).toEqual(
       Array.from({ length: size(feed.order) }, (_, i) => i),
     )
+  })
+})
+
+function splitAtGroups(rows: readonly FeedRow[]): FeedRow[][] {
+  const result: FeedRow[][] = []
+  for (const row of rows) {
+    if (row.kind === 'group') result.push([])
+    else result[result.length - 1].push(row)
+  }
+  return result
+}
+
+function gapPosition(rows: readonly FeedRow[]): number {
+  expect(rows.filter((row) => row.kind === 'gap')).toHaveLength(1)
+  return rows.findIndex((row) => row.kind === 'gap')
+}
+
+describe('selectFeedRows with a gap', () => {
+  const { initial, batches } = simulate(7, 200)
+  const before = ingestTicks(createFeed(initial), batches.slice(0, 60))
+  const slate = simulate(7, 70).final.games.map(({ game }) => game)
+  const resynced = receive(
+    before,
+    [
+      {
+        kind: 'resynced',
+        games: slate,
+        since: 60_000,
+        missed: batches.slice(60, 70).flat().length,
+      },
+    ],
+    70_000,
+  )
+  const later = batches.slice(70)
+  const gapped = receive(
+    resynced,
+    later.map((events) => ({ kind: 'events', events })),
+    200_000,
+  )
+  const arrivedAfter = new Set(later.flat().map((event) => event.id))
+
+  function newerCount(rows: readonly FeedRow[]): number {
+    return eventsOf(rows).filter((event) => arrivedAfter.has(event.id)).length
+  }
+
+  it('places the gap between the events that arrived after the resync and those before it', () => {
+    const rows = selectFeedRows(gapped, DEFAULT_QUERY)
+    expect(eventsOf(rows)).toEqual(feedEvents(gapped))
+    expect(newerCount(rows)).toBeGreaterThan(0)
+    expect(gapPosition(rows)).toBe(newerCount(rows))
+    expect(rows[gapPosition(rows)]).toEqual({
+      kind: 'gap',
+      key: `gap:all:${before.order.written}`,
+      gap: gapped.gaps[0],
+    })
+  })
+
+  it('repeats the gap inside each game section at that section’s own boundary', () => {
+    const rows = selectFeedRows(gapped, query({ group: 'game' }))
+    const groups = splitAtGroups(rows)
+    expect(groups.some((group) => newerCount(group) === 0)).toBe(true)
+    expect(groups.some((group) => newerCount(group) === eventsOf(group).length)).toBe(true)
+    for (const group of groups) expect(gapPosition(group)).toBe(newerCount(group))
+    expect(new Set(rows.map((row) => row.key)).size).toBe(rows.length)
+  })
+
+  it('steps selection across the gap row as if it were not there', () => {
+    const rows = selectFeedRows(gapped, DEFAULT_QUERY)
+    const ids = eventsOf(rows).map((event) => event.id)
+    const boundary = gapPosition(rows)
+    expect(stepSelection(rows, ids[boundary - 1], 1)).toEqual({
+      id: ids[boundary],
+      index: boundary + 1,
+    })
+    expect(stepSelection(rows, ids[boundary], -1)).toEqual({
+      id: ids[boundary - 1],
+      index: boundary - 1,
+    })
+  })
+
+  it('still reports no matches when the filters exclude every event', () => {
+    expect(selectFeedView(gapped, query({ q: 'no team is called this' })).kind).toBe('no-matches')
   })
 })
 
