@@ -1,3 +1,4 @@
+import type { Game } from './game'
 import type { EventId, GameId, TeamId } from './ids'
 
 export type Severity = 'info' | 'notable' | 'critical'
@@ -33,6 +34,7 @@ export type GameEvent = EventBase &
         readonly to: number
       }
     | { readonly kind: 'game_ended'; readonly score: Score }
+    | { readonly kind: 'game_scheduled'; readonly game: Game; readonly replaces: GameId }
   )
 
 export type EventKind = GameEvent['kind']

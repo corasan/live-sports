@@ -6,6 +6,7 @@ import { EventFeed } from './EventFeed'
 import { BUTTON, FeedControls } from './FeedControls'
 import { Scoreboard } from './Scoreboard'
 import { StaleBanner } from './StaleBanner'
+import { StressControls } from './StressControls'
 
 export function LiveBoard({
   seed,
@@ -18,13 +19,14 @@ export function LiveBoard({
   selected: EventId | undefined
   related: RelatedScope
 }) {
-  const { store, paused, togglePaused } = useSimulation(seed)
+  const { store, paused, togglePaused, rate, setRate } = useSimulation(seed)
   return (
     <main className="mx-auto flex max-w-6xl flex-col gap-6 p-6">
-      <header className="flex items-center justify-between">
+      <header className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-bold">Live games</h1>
-        <div className="flex items-center gap-3 text-sm text-slate-500">
+        <div className="flex flex-wrap items-center gap-3 text-sm text-slate-500">
           <span>Seed {seed}</span>
+          <StressControls store={store} rate={rate} onRateChange={setRate} />
           <button type="button" onClick={togglePaused} className={BUTTON}>
             {paused ? 'Resume simulation' : 'Pause simulation'}
           </button>

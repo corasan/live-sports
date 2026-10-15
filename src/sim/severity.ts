@@ -23,6 +23,7 @@ export function severityOf(draft: EventDraft, before: Game, rules: LeagueRules):
       return 'notable'
     case 'game_started':
     case 'period_ended':
+    case 'game_scheduled':
       return 'info'
   }
 }

@@ -1,5 +1,5 @@
 import type { GameEvent, Market, Severity } from '#/domain/event'
-import { PERIOD_PREFIX, type Game } from '#/domain/game'
+import { matchupLabel, PERIOD_PREFIX, type Game } from '#/domain/game'
 import type { TeamId } from '#/domain/ids'
 
 export type Matchup = Pick<Game, 'league' | 'home' | 'away'>
@@ -46,5 +46,7 @@ export function describeEvent(event: GameEvent, matchup: Matchup): string {
       return `${MARKET_LABEL[event.market]} ${event.from} → ${event.to}`
     case 'game_ended':
       return `Final ${event.score.away}-${event.score.home}`
+    case 'game_scheduled':
+      return `Scheduled: ${matchupLabel(event.game)}`
   }
 }
