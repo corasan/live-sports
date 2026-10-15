@@ -1,6 +1,6 @@
 import type { GameEvent, Severity } from '#/domain/event'
 import { matchupLabel, type Game, type GameStatus, type League } from '#/domain/game'
-import type { EventId, GameId, TeamId } from '#/domain/ids'
+import { parseEventId, parseGameId, type EventId, type GameId, type TeamId } from '#/domain/ids'
 import { ROSTER, ROSTERS } from '#/sim/roster'
 import { eventAt, lookup, type Feed } from './feed'
 import { memoizeLast } from './memo'
@@ -35,8 +35,19 @@ export const DEFAULT_RELATED: RelatedScope = 'game'
 
 export type DriveSpan = { readonly start: number; readonly end: number }
 
+export type Selection =
+  | { readonly kind: 'event'; readonly id: EventId }
+  | { readonly kind: 'game'; readonly id: GameId }
+
+export type SelectionSearch = {
+  readonly event: EventId | undefined
+  readonly game: GameId | undefined
+}
+
+type Missing = { readonly kind: 'missing' }
+
 export type EventDetail =
-  | { readonly kind: 'missing' }
+  | Missing
   | {
       readonly kind: 'found'
       readonly event: GameEvent
@@ -44,6 +55,15 @@ export type EventDetail =
       readonly timeline: readonly GameEvent[]
       readonly driveSpan: DriveSpan
       readonly related: readonly GameEvent[]
+    }
+
+export type GameDetail =
+  | Missing
+  | {
+      readonly kind: 'found'
+      readonly game: Game
+      readonly timeline: readonly GameEvent[]
+      readonly recent: readonly GameEvent[]
     }
 
 export type Step = { readonly id: EventId; readonly index: number }
@@ -85,7 +105,7 @@ const GROUPINGS: Readonly<
   league: (game) => ({ key: game.league, label: game.league }),
 }
 
-const MISSING: EventDetail = { kind: 'missing' }
+const MISSING: Missing = { kind: 'missing' }
 
 const IN_SCOPE: Readonly<Record<RelatedScope, (selected: GameEvent, other: GameEvent) => boolean>> =
   {
@@ -222,6 +242,36 @@ export function selectFeedRows(feed: Feed, query: FeedQuery): readonly FeedRow[]
   )
 }
 
+export function parseSelection(raw: {
+  readonly event?: string
+  readonly game?: string
+}): Selection | undefined {
+  const event = raw.event === undefined ? undefined : parseEventId(raw.event)
+  if (event !== undefined) return { kind: 'event', id: event }
+  const game = raw.game === undefined ? undefined : parseGameId(raw.game)
+  return game === undefined ? undefined : { kind: 'game', id: game }
+}
+
+export function selectionSearch(selection: Selection | undefined): SelectionSearch {
+  return {
+    event: selection?.kind === 'event' ? selection.id : undefined,
+    game: selection?.kind === 'game' ? selection.id : undefined,
+  }
+}
+
+function gameEventsNewestFirst(
+  events: ReadonlyMap<EventId, GameEvent>,
+  order: Ring<EventId>,
+  id: GameId,
+): GameEvent[] {
+  const newestFirst: GameEvent[] = []
+  for (let age = 0; age < size(order); age++) {
+    const event = eventAt({ events, order }, age)
+    if (event.gameId === id) newestFirst.push(event)
+  }
+  return newestFirst
+}
+
 const eventDetail = memoizeLast(
   (
     events: ReadonlyMap<EventId, GameEvent>,
@@ -232,11 +282,7 @@ const eventDetail = memoizeLast(
   ): EventDetail => {
     const event = events.get(id)
     if (event === undefined) return MISSING
-    const newestFirst: GameEvent[] = []
-    for (let age = 0; age < size(order); age++) {
-      const other = eventAt({ events, order }, age)
-      if (other.gameId === event.gameId) newestFirst.push(other)
-    }
+    const newestFirst = gameEventsNewestFirst(events, order, event.gameId)
     const inScope = IN_SCOPE[scope]
     const drive = newestFirst.filter((other) => IN_SCOPE.drive(event, other))
     return {
@@ -252,6 +298,24 @@ const eventDetail = memoizeLast(
 
 export function selectEventDetail(feed: Feed, id: EventId, scope: RelatedScope): EventDetail {
   return eventDetail(feed.events, feed.order, feed.games, id, scope)
+}
+
+const gameDetail = memoizeLast(
+  (
+    events: ReadonlyMap<EventId, GameEvent>,
+    order: Ring<EventId>,
+    games: ReadonlyMap<GameId, Game>,
+    id: GameId,
+  ): GameDetail => {
+    const game = games.get(id)
+    if (game === undefined) return MISSING
+    const recent = gameEventsNewestFirst(events, order, id)
+    return { kind: 'found', game, timeline: recent.toReversed(), recent }
+  },
+)
+
+export function selectGameDetail(feed: Feed, id: GameId): GameDetail {
+  return gameDetail(feed.events, feed.order, feed.games, id)
 }
 
 export function stepSelection(

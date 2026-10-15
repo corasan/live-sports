@@ -40,3 +40,7 @@ export function eventId(sequence: number): EventId {
 export function parseEventId(raw: string): EventId | undefined {
   return isEventId(raw) ? raw : undefined
 }
+
+export function parseGameId(raw: string): GameId | undefined {
+  return isGameId(raw) ? raw : undefined
+}

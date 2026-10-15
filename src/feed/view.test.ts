@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { GameEvent } from '#/domain/event'
 import type { Game } from '#/domain/game'
-import { eventId, type EventId, type TeamId } from '#/domain/ids'
+import { eventId, gameId, type EventId, type TeamId } from '#/domain/ids'
 import { ROSTERS } from '#/sim/roster'
 import { createFeed, ingest, type Feed } from './feed'
 import { feedEvents, gamesOf, ingestTicks, simulate, simulatedFeed, TICK_MS } from './fixtures'
@@ -12,7 +12,9 @@ import {
   DEFAULT_QUERY,
   leagueSelection,
   parseFeedQuery,
+  parseSelection,
   selectEventDetail,
+  selectGameDetail,
   selectFeedRows,
   selectFeedView,
   selectHeldView,
@@ -356,6 +358,64 @@ describe('selectEventDetail', () => {
     const first = selectEventDetail(feed, selected.id, 'drive')
     expect(selectEventDetail(feed, selected.id, 'drive')).toBe(first)
     expect(selectEventDetail(feed, selected.id, 'game')).not.toBe(first)
+  })
+})
+
+describe('selectGameDetail', () => {
+  const selected = emitted[emitted.length >> 1].gameId
+  const ofGame = emitted.filter((event) => event.gameId === selected)
+
+  const found = (target: Feed) => {
+    const detail = selectGameDetail(target, selected)
+    if (detail.kind !== 'found') throw new Error('expected the selected game to be found')
+    return detail
+  }
+
+  it('returns the game with exactly its events oldest first on the timeline', () => {
+    const detail = found(feed)
+    expect(ofGame.length).toBeGreaterThan(1)
+    expect(detail.game).toBe(feed.games.get(selected))
+    expect(detail.timeline).toEqual(ofGame)
+  })
+
+  it('lists recent events newest first', () => {
+    expect(found(feed).recent).toEqual(ofGame.toReversed())
+  })
+
+  it('reports missing for an unknown id and for a game evicted from the feed', () => {
+    expect(selectGameDetail(feed, gameId('nba-999999'))).toEqual({ kind: 'missing' })
+    const small = simulatedFeed(7, 400, 50)
+    const evicted = small.events.find((event) => !small.feed.games.has(event.gameId))
+    if (evicted === undefined) throw new Error('fixture evicted no game')
+    expect(selectGameDetail(small.feed, evicted.gameId)).toEqual({ kind: 'missing' })
+  })
+
+  it('returns the cached detail across heartbeats until the ring changes', () => {
+    const first = found(feed)
+    expect(found(ingest(feed, [], Date.now()))).toBe(first)
+    const later = ingestTicks(feed, simulate(7, 140).batches.slice(120))
+    expect(size(later.order)).toBeGreaterThan(size(feed.order))
+    expect(selectGameDetail(later, selected)).not.toBe(first)
+  })
+})
+
+describe('parseSelection', () => {
+  const event = eventId(12)
+  const game = gameId('nba-3')
+
+  it('parses a single event or game selection', () => {
+    expect(parseSelection({ event })).toEqual({ kind: 'event', id: event })
+    expect(parseSelection({ game })).toEqual({ kind: 'game', id: game })
+  })
+
+  it('prefers the event when both arrive', () => {
+    expect(parseSelection({ event, game })).toEqual({ kind: 'event', id: event })
+  })
+
+  it('ignores malformed and missing ids', () => {
+    expect(parseSelection({})).toBeUndefined()
+    expect(parseSelection({ event: 'nope', game: 'Not A Slug' })).toBeUndefined()
+    expect(parseSelection({ event: '42', game: 'nba-3' })).toEqual({ kind: 'game', id: game })
   })
 })
 
