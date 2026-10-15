@@ -73,12 +73,20 @@ export type FeedRow =
   | {
       readonly kind: 'event'
       readonly key: EventId
+      readonly seq: number
       readonly event: GameEvent
       readonly game: Game
     }
   | { readonly kind: 'gap'; readonly key: string; readonly gap: Gap }
+  | { readonly kind: 'since'; readonly key: string; readonly count: number }
 
-type Section = { readonly key: string; readonly rows: FeedRow[]; pending: number }
+type Section = {
+  readonly key: string
+  readonly rows: FeedRow[]
+  pending: number
+  fresh: number
+  marked: boolean
+}
 
 const SEVERITY_RANK: Readonly<Record<Severity, number>> = {
   info: 0,
@@ -214,6 +222,7 @@ const feedRows = memoizeLast(
     severity: Severity,
     q: string,
     group: EventGrouping,
+    since: number | null,
   ): readonly FeedRow[] => {
     const passes = eventMatcher(games, teams, severity, q)
     const groupOf = GROUPINGS[group]
@@ -235,18 +244,29 @@ const feedRows = memoizeLast(
       if (section === undefined) {
         const rows: FeedRow[] =
           label === null ? [] : [{ kind: 'group', key: `group:${key}`, label }]
-        section = { key, rows, pending: 0 }
+        section = { key, rows, pending: 0, fresh: 0, marked: false }
         sections.set(key, section)
       }
-      emitGapsAbove(section, order.written - 1 - age)
-      section.rows.push({ kind: 'event', key: event.id, event, game })
+      const seq = order.written - 1 - age
+      emitGapsAbove(section, seq)
+      if (seq >= (since ?? Infinity)) section.fresh++
+      else if (!section.marked) {
+        section.marked = true
+        if (section.fresh > 0)
+          section.rows.push({ kind: 'since', key: `since:${section.key}`, count: section.fresh })
+      }
+      section.rows.push({ kind: 'event', key: event.id, seq, event, game })
     }
     for (const section of sections.values()) emitGapsAbove(section, -1)
     return [...sections.values()].flatMap((section) => section.rows)
   },
 )
 
-export function selectFeedRows(feed: Feed, query: FeedQuery): readonly FeedRow[] {
+export function selectFeedRows(
+  feed: Feed,
+  query: FeedQuery,
+  since: number | null,
+): readonly FeedRow[] {
   return feedRows(
     feed.games,
     feed.events,
@@ -256,6 +276,7 @@ export function selectFeedRows(feed: Feed, query: FeedQuery): readonly FeedRow[]
     query.severity,
     query.q,
     query.group,
+    since,
   )
 }
 
@@ -384,15 +405,15 @@ const NO_MATCHES: FeedView = { kind: 'no-matches' }
 
 const rowsView = memoizeLast((rows: readonly FeedRow[]): FeedView => ({ kind: 'rows', rows }))
 
-export function selectFeedView(feed: Feed, query: FeedQuery): FeedView {
+export function selectFeedView(feed: Feed, query: FeedQuery, since: number | null): FeedView {
   if (feed.syncedAt === null) return LOADING
   if (size(feed.order) === 0) return EMPTY
-  const rows = selectFeedRows(feed, query)
+  const rows = selectFeedRows(feed, query, since)
   return rows.length === 0 ? NO_MATCHES : rowsView(rows)
 }
 
-export function selectHeldView(snapshot: Feed, query: FeedQuery): FeedView {
-  const view = selectFeedView(snapshot, query)
+export function selectHeldView(snapshot: Feed, query: FeedQuery, since: number | null): FeedView {
+  const view = selectFeedView(snapshot, query, since)
   return view === LOADING ? EMPTY : view
 }
 

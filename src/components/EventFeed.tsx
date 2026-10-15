@@ -38,6 +38,17 @@ const SKELETON_ROWS = 8
 
 const NO_ROWS: readonly FeedRow[] = []
 
+type HoldReason = 'paused' | 'scrolled'
+
+type Hold = { readonly snapshot: Feed; readonly reason: HoldReason }
+
+type Mark = { readonly at: number; readonly reason: HoldReason }
+
+const SINCE_LABEL: Readonly<Record<HoldReason, string>> = {
+  paused: 'since you paused',
+  scrolled: 'since you scrolled away',
+}
+
 const KEY_STEP: ReadonlyMap<string, 1 | -1> = new Map([
   ['ArrowDown', 1],
   ['ArrowUp', -1],
@@ -49,14 +60,21 @@ const EventRow = memo(function EventRow({
   home,
   away,
   selected,
+  arriving,
   onSelect,
-}: { event: GameEvent; selected: boolean; onSelect: (id: EventId) => void } & Matchup) {
+}: {
+  event: GameEvent
+  selected: boolean
+  arriving: boolean
+  onSelect: (id: EventId) => void
+} & Matchup) {
+  const [arrived] = useState(arriving)
   return (
     <button
       type="button"
       aria-current={selected || undefined}
       onClick={() => onSelect(event.id)}
-      className={`flex h-full w-full cursor-pointer items-center gap-3 rounded border-l-4 px-3 text-left text-sm whitespace-nowrap ${SEVERITY_STYLE[event.severity]} ${selected ? SELECTED_STYLE : 'hover:brightness-95'}`}
+      className={`flex h-full w-full cursor-pointer items-center gap-3 rounded border-l-4 px-3 text-left text-sm whitespace-nowrap ${SEVERITY_STYLE[event.severity]} ${selected ? SELECTED_STYLE : 'hover:brightness-95'} ${arrived ? 'animate-arrive' : ''}`}
     >
       <time className="text-xs text-slate-400 tabular-nums">{eventTime(event)}</time>
       <span className="text-xs text-slate-500">{matchupLabel({ home, away })}</span>
@@ -81,13 +99,29 @@ function GapRow({ gap }: { gap: Gap }) {
   )
 }
 
+function SinceRow({ count, reason }: { count: number; reason: HoldReason }) {
+  return (
+    <p className="flex h-full items-center gap-3 text-xs font-medium text-sky-700">
+      <span className="flex-1 border-t border-sky-400" />
+      <span className="tabular-nums">
+        {count} new {SINCE_LABEL[reason]}
+      </span>
+      <span className="flex-1 border-t border-sky-400" />
+    </p>
+  )
+}
+
 function FeedRowView({
   row,
   selected,
+  arrivedFrom,
+  mark,
   onSelect,
 }: {
   row: FeedRow
   selected: EventId | undefined
+  arrivedFrom: number
+  mark: Mark | null
   onSelect: (id: EventId) => void
 }) {
   switch (row.kind) {
@@ -100,12 +134,15 @@ function FeedRowView({
           home={home}
           away={away}
           selected={row.key === selected}
+          arriving={row.seq >= arrivedFrom}
           onSelect={onSelect}
         />
       )
     }
     case 'gap':
       return <GapRow gap={row.gap} />
+    case 'since':
+      return mark !== null && <SinceRow count={row.count} reason={mark.reason} />
     case 'group':
       return (
         <h3 className="flex h-full items-end pb-1 text-sm font-semibold text-slate-700">
@@ -190,13 +227,23 @@ export function EventFeed({
 }) {
   const [paused, setPaused] = useState(false)
   const [scrolledAway, setScrolledAway] = useState(false)
-  const [snapshot, setSnapshot] = useState<Feed | null>(null)
-  const held = paused || scrolledAway
-  if (held && snapshot === null) setSnapshot(store.getState())
-  if (!held && snapshot !== null) setSnapshot(null)
+  const [hold, setHold] = useState<Hold | null>(null)
+  const [mark, setMark] = useState<Mark | null>(null)
+  const reason: HoldReason | null = paused ? 'paused' : scrolledAway ? 'scrolled' : null
+  if (reason !== null && hold === null) setHold({ snapshot: store.getState(), reason })
+  if (reason === null && hold !== null) {
+    setMark({ at: hold.snapshot.order.written, reason: hold.reason })
+    setHold(null)
+  }
+  const since = mark?.at ?? null
   const view = useStore(store, (feed) =>
-    snapshot === null ? selectFeedView(feed, query) : selectHeldView(snapshot, query),
+    hold === null
+      ? selectFeedView(feed, query, since)
+      : selectHeldView(hold.snapshot, query, since),
   )
+  const written = useStore(store, (feed) => (hold?.snapshot ?? feed).order.written)
+  const [[lastWritten, arrivedFrom], setArrival] = useState([written, written])
+  if (written !== lastWritten) setArrival([written, lastWritten])
   const reconnecting = useStore(store, (feed) => feed.connection.kind === 'reconnecting')
   const rows = view.kind === 'rows' ? view.rows : NO_ROWS
   const choose = useSelect()
@@ -274,15 +321,26 @@ export function EventFeed({
                     className="absolute inset-x-0 top-0 pb-2"
                     style={{ height: ROW_HEIGHT, transform: `translateY(${item.start}px)` }}
                   >
-                    <FeedRowView row={rows[item.index]} selected={selected} onSelect={select} />
+                    <FeedRowView
+                      row={rows[item.index]}
+                      selected={selected}
+                      arrivedFrom={arrivedFrom}
+                      mark={mark}
+                      onSelect={select}
+                    />
                   </li>
                 ))}
               </ol>
             )}
           </div>
         )}
-        {snapshot !== null && (
-          <NewEventsPill store={store} snapshot={snapshot} query={query} onClick={jumpToLatest} />
+        {hold !== null && (
+          <NewEventsPill
+            store={store}
+            snapshot={hold.snapshot}
+            query={query}
+            onClick={jumpToLatest}
+          />
         )}
       </div>
     </section>
