@@ -9,10 +9,12 @@ export const LEAGUE_FILTERS = ['all', ...LEAGUES] as const
 export const SEVERITIES = ['info', 'notable', 'critical'] as const satisfies readonly Severity[]
 export const GAME_SORT_OPTIONS = ['schedule', 'closest', 'league'] as const
 export const EVENT_GROUPINGS = ['none', 'game', 'league'] as const
+export const RELATED_SCOPES = ['game', 'drive'] as const
 
 export type LeagueFilter = (typeof LEAGUE_FILTERS)[number]
 export type GameSort = (typeof GAME_SORT_OPTIONS)[number]
 export type EventGrouping = (typeof EVENT_GROUPINGS)[number]
+export type RelatedScope = (typeof RELATED_SCOPES)[number]
 
 export type FeedQuery = {
   readonly league: LeagueFilter
@@ -29,6 +31,23 @@ export const DEFAULT_QUERY: FeedQuery = {
   sort: 'schedule',
   group: 'none',
 }
+
+export const DEFAULT_RELATED: RelatedScope = 'game'
+
+export type DriveSpan = { readonly start: number; readonly end: number }
+
+export type EventDetail =
+  | { readonly kind: 'missing' }
+  | {
+      readonly kind: 'found'
+      readonly event: GameEvent
+      readonly game: Game
+      readonly timeline: readonly GameEvent[]
+      readonly driveSpan: DriveSpan
+      readonly related: readonly GameEvent[]
+    }
+
+export type Step = { readonly id: EventId; readonly index: number }
 
 export type FeedRow =
   | { readonly kind: 'group'; readonly key: string; readonly label: string }
@@ -66,6 +85,14 @@ const GROUPINGS: Readonly<
   game: (game) => ({ key: game.id, label: matchupLabel(game) }),
   league: (game) => ({ key: game.league, label: game.league }),
 }
+
+const MISSING: EventDetail = { kind: 'missing' }
+
+const IN_SCOPE: Readonly<Record<RelatedScope, (selected: GameEvent, other: GameEvent) => boolean>> =
+  {
+    game: () => true,
+    drive: (selected, other) => other.drive === selected.drive,
+  }
 
 export function parseOption<T extends string>(
   options: readonly T[],
@@ -164,6 +191,53 @@ export function selectFeedRows(feed: Feed, query: FeedQuery): readonly FeedRow[]
     query.q,
     query.group,
   )
+}
+
+const eventDetail = memoizeLast(
+  (
+    events: ReadonlyMap<EventId, GameEvent>,
+    order: Ring<EventId>,
+    games: ReadonlyMap<GameId, Game>,
+    id: EventId,
+    scope: RelatedScope,
+  ): EventDetail => {
+    const event = events.get(id)
+    if (event === undefined) return MISSING
+    const newestFirst: GameEvent[] = []
+    for (let age = 0; age < size(order); age++) {
+      const other = eventAt({ events, order }, age)
+      if (other.gameId === event.gameId) newestFirst.push(other)
+    }
+    const inScope = IN_SCOPE[scope]
+    const drive = newestFirst.filter((other) => IN_SCOPE.drive(event, other))
+    return {
+      kind: 'found',
+      event,
+      game: lookup(games, event.gameId),
+      timeline: newestFirst.toReversed(),
+      driveSpan: { start: (drive.at(-1) ?? event).ts, end: (drive.at(0) ?? event).ts },
+      related: newestFirst.filter((other) => other.id !== event.id && inScope(event, other)),
+    }
+  },
+)
+
+export function selectEventDetail(feed: Feed, id: EventId, scope: RelatedScope): EventDetail {
+  return eventDetail(feed.events, feed.order, feed.games, id, scope)
+}
+
+export function stepSelection(
+  rows: readonly FeedRow[],
+  selected: EventId | undefined,
+  delta: 1 | -1,
+): Step | null {
+  const current = selected === undefined ? -1 : rows.findIndex((row) => row.key === selected)
+  const direction = current === -1 ? 1 : delta
+  for (let index = current + direction; index >= 0 && index < rows.length; index += direction) {
+    const row = rows[index]
+    if (row.kind === 'event') return { id: row.key, index }
+  }
+  const stay = rows.at(current)
+  return current !== -1 && stay?.kind === 'event' ? { id: stay.key, index: current } : null
 }
 
 const newEventCount = memoizeLast(

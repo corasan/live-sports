@@ -1,15 +1,23 @@
 import { useVirtualizer } from '@tanstack/react-virtual'
-import { memo, useCallback, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useEffectEvent, useRef, useState } from 'react'
 import { useStore } from 'zustand'
-import type { GameEvent, Market, Severity } from '#/domain/event'
-import { matchupLabel, type Game } from '#/domain/game'
-import type { TeamId } from '#/domain/ids'
+import type { GameEvent } from '#/domain/event'
+import { matchupLabel } from '#/domain/game'
+import type { EventId } from '#/domain/ids'
 import type { Feed } from '#/feed/feed'
 import { size } from '#/feed/ring'
 import type { FeedStore } from '#/feed/store'
-import { countNewEvents, selectFeedRows, type FeedQuery, type FeedRow } from '#/feed/view'
+import {
+  countNewEvents,
+  selectFeedRows,
+  stepSelection,
+  type FeedQuery,
+  type FeedRow,
+} from '#/feed/view'
+import { describeEvent, eventTime, SEVERITY_STYLE, type Matchup } from './describeEvent'
 import { BUTTON } from './FeedControls'
-import { PERIOD_PREFIX } from './Scoreboard'
+import { isPlainKeypress } from './keys'
+import { useSearchPatch } from './useSearchPatch'
 
 const ROW_HEIGHT = 44
 
@@ -17,66 +25,56 @@ const OVERSCAN = 12
 
 const SCROLL_THRESHOLD = 1
 
-type Matchup = Pick<Game, 'league' | 'home' | 'away'>
+const SELECTED_STYLE = 'ring-2 ring-sky-500 ring-inset'
 
-const SEVERITY_STYLE: Readonly<Record<Severity, string>> = {
-  info: 'border-slate-200 text-slate-600',
-  notable: 'border-amber-400 bg-amber-50 text-slate-900',
-  critical: 'border-red-500 bg-red-50 font-semibold text-red-900',
-}
-
-const MARKET_LABEL: Readonly<Record<Market, string>> = {
-  moneyline: 'Home win %',
-  spread: 'Spread',
-  total: 'Total',
-}
-
-function teamName(matchup: Matchup, id: TeamId): string {
-  return id === matchup.home.id ? matchup.home.name : matchup.away.name
-}
-
-function describeEvent(event: GameEvent, matchup: Matchup): string {
-  switch (event.kind) {
-    case 'game_started':
-      return 'Game started'
-    case 'score':
-      return `${teamName(matchup, event.teamId)} +${event.points} (${event.score.away}-${event.score.home})`
-    case 'lead_change':
-      return `${teamName(matchup, event.leader)} take the lead`
-    case 'period_ended':
-      return `End of ${PERIOD_PREFIX[matchup.league]}${event.period}`
-    case 'injury':
-      return `${event.player} (${teamName(matchup, event.teamId)}) injured`
-    case 'odds_shift':
-      return `${MARKET_LABEL[event.market]} ${event.from} → ${event.to}`
-    case 'game_ended':
-      return `Final ${event.score.away}-${event.score.home}`
-  }
-}
+const KEY_STEP: ReadonlyMap<string, 1 | -1> = new Map([
+  ['ArrowDown', 1],
+  ['ArrowUp', -1],
+])
 
 const EventRow = memo(function EventRow({
   event,
   league,
   home,
   away,
-}: { event: GameEvent } & Matchup) {
+  selected,
+  onSelect,
+}: { event: GameEvent; selected: boolean; onSelect: (id: EventId) => void } & Matchup) {
   return (
-    <div
-      className={`flex h-full items-center gap-3 rounded border-l-4 px-3 text-sm whitespace-nowrap ${SEVERITY_STYLE[event.severity]}`}
+    <button
+      type="button"
+      aria-current={selected || undefined}
+      onClick={() => onSelect(event.id)}
+      className={`flex h-full w-full cursor-pointer items-center gap-3 rounded border-l-4 px-3 text-left text-sm whitespace-nowrap ${SEVERITY_STYLE[event.severity]} ${selected ? SELECTED_STYLE : 'hover:brightness-95'}`}
     >
-      <time className="text-xs text-slate-400 tabular-nums">
-        {new Date(event.ts).toLocaleTimeString()}
-      </time>
+      <time className="text-xs text-slate-400 tabular-nums">{eventTime(event)}</time>
       <span className="text-xs text-slate-500">{matchupLabel({ home, away })}</span>
       <span className="min-w-0 truncate">{describeEvent(event, { league, home, away })}</span>
-    </div>
+    </button>
   )
 })
 
-function FeedRowView({ row }: { row: FeedRow }) {
+function FeedRowView({
+  row,
+  selected,
+  onSelect,
+}: {
+  row: FeedRow
+  selected: EventId | undefined
+  onSelect: (id: EventId) => void
+}) {
   if (row.kind === 'event') {
     const { league, home, away } = row.game
-    return <EventRow event={row.event} league={league} home={home} away={away} />
+    return (
+      <EventRow
+        event={row.event}
+        league={league}
+        home={home}
+        away={away}
+        selected={row.key === selected}
+        onSelect={onSelect}
+      />
+    )
   }
   return (
     <h3 className="flex h-full items-end pb-1 text-sm font-semibold text-slate-700">{row.label}</h3>
@@ -111,7 +109,15 @@ function NewEventsPill({
   )
 }
 
-export function EventFeed({ store, query }: { store: FeedStore; query: FeedQuery }) {
+export function EventFeed({
+  store,
+  query,
+  selected,
+}: {
+  store: FeedStore
+  query: FeedQuery
+  selected: EventId | undefined
+}) {
   const [paused, setPaused] = useState(false)
   const [scrolledAway, setScrolledAway] = useState(false)
   const [snapshot, setSnapshot] = useState<Feed | null>(null)
@@ -120,6 +126,8 @@ export function EventFeed({ store, query }: { store: FeedStore; query: FeedQuery
   if (!held && snapshot !== null) setSnapshot(null)
   const waiting = useStore(store, (feed) => size(feed.order) === 0)
   const rows = useStore(store, (feed) => selectFeedRows(snapshot ?? feed, query))
+  const patch = useSearchPatch()
+  const select = useCallback((event: EventId) => patch({ event }), [patch])
   const scrollRef = useRef<HTMLDivElement>(null)
   const getItemKey = useCallback((index: number) => rows[index].key, [rows])
   const virtualizer = useVirtualizer({
@@ -130,13 +138,28 @@ export function EventFeed({ store, query }: { store: FeedStore; query: FeedQuery
     overscan: OVERSCAN,
   })
 
+  const onKeyDown = useEffectEvent((event: KeyboardEvent) => {
+    const delta = KEY_STEP.get(event.key)
+    if (delta === undefined || !isPlainKeypress(event)) return
+    const next = stepSelection(rows, selected, delta)
+    if (next === null) return
+    event.preventDefault()
+    select(next.id)
+    virtualizer.scrollToIndex(next.index, { align: 'auto' })
+  })
+
+  useEffect(() => {
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [])
+
   function jumpToLatest() {
     scrollRef.current?.scrollTo({ top: 0, behavior: 'instant' })
     setPaused(false)
   }
 
   return (
-    <section className="flex flex-col gap-2">
+    <section className="flex min-w-0 flex-col gap-2">
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold">Feed</h2>
         <button
@@ -166,7 +189,7 @@ export function EventFeed({ store, query }: { store: FeedStore; query: FeedQuery
                     className="absolute inset-x-0 top-0 pb-2"
                     style={{ height: ROW_HEIGHT, transform: `translateY(${item.start}px)` }}
                   >
-                    <FeedRowView row={rows[item.index]} />
+                    <FeedRowView row={rows[item.index]} selected={selected} onSelect={select} />
                   </li>
                 ))}
               </ol>

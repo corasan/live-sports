@@ -1,4 +1,3 @@
-import { useNavigate } from '@tanstack/react-router'
 import type { Severity } from '#/domain/event'
 import {
   EVENT_GROUPINGS,
@@ -11,6 +10,7 @@ import {
   type GameSort,
   type LeagueFilter,
 } from '#/feed/view'
+import { useSearchPatch } from './useSearchPatch'
 
 const LEAGUE_LABEL: Readonly<Record<LeagueFilter, string>> = {
   all: 'All leagues',
@@ -74,9 +74,7 @@ function Select<T extends string>({
 }
 
 export function FeedControls({ query }: { query: FeedQuery }) {
-  const navigate = useNavigate({ from: '/' })
-  const update = (patch: Partial<FeedQuery>) =>
-    navigate({ search: (previous) => ({ ...previous, ...patch }), replace: true })
+  const update = useSearchPatch()
   return (
     <div className="flex flex-wrap items-end gap-3">
       <label className={FIELD}>

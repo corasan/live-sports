@@ -1,4 +1,4 @@
-import type { EventDraft, GameEvent, Market } from '#/domain/event'
+import type { EventDraft, EventKind, GameEvent, Market } from '#/domain/event'
 import { applyEvent, leaderOf, LEAGUES, type Game, type League, type Odds } from '#/domain/game'
 import { eventId, gameId, teamId, type TeamId } from '#/domain/ids'
 import { LEAGUE_RULES, type LeagueRules, type MarketRules, type PlayKind } from './leagues'
@@ -10,6 +10,7 @@ export type SimGame = {
   readonly startsAtTick: number
   readonly elapsed: number
   readonly lastLeader: TeamId | null
+  readonly drive: number
 }
 
 export type SimState = {
@@ -26,6 +27,16 @@ type Progress = { readonly drafts: readonly EventDraft[]; readonly elapsed: numb
 type Play = (entry: SimGame, rules: LeagueRules, rng: Rng) => readonly EventDraft[]
 
 const MARKETS = ['moneyline', 'spread', 'total'] as const satisfies readonly Market[]
+
+const CLOSES_DRIVE: Readonly<Record<EventKind, boolean>> = {
+  game_started: false,
+  score: true,
+  lead_change: false,
+  period_ended: true,
+  injury: false,
+  odds_shift: false,
+  game_ended: false,
+}
 
 const PLAYERS = [
   'J. Okafor',
@@ -77,18 +88,27 @@ export function step(state: SimState, now: number): StepResult {
     const rules = LEAGUE_RULES[entry.game.league]
     const { drafts, elapsed } = advance(entry, tick, rules, rng)
     let game = entry.game
+    let drive = entry.drive
     for (const draft of drafts) {
       const event: GameEvent = {
         ...draft,
         id: eventId(nextSequence++),
         ts: now,
         gameId: game.id,
+        drive,
         severity: severityOf(draft, game, rules),
       }
       game = applyEvent(game, event)
       events.push(event)
+      if (CLOSES_DRIVE[event.kind]) drive++
     }
-    return { ...entry, game, elapsed, lastLeader: leaderOf(game, game.score) ?? entry.lastLeader }
+    return {
+      ...entry,
+      game,
+      elapsed,
+      drive,
+      lastLeader: leaderOf(game, game.score) ?? entry.lastLeader,
+    }
   })
 
   return { state: { tick, nextSequence, rngState: rng.state(), games }, events }
@@ -139,6 +159,7 @@ function seedLeague(league: League, rng: Rng): SimGame[] {
     startsAtTick: index === 0 ? 1 : rng.int(2, 40),
     elapsed: 0,
     lastLeader: null,
+    drive: 0,
   }))
 }
 
