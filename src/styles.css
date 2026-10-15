@@ -1,5 +1,15 @@
 @import 'tailwindcss';
 
+@theme {
+  --animate-arrive: arrive 1.6s ease-out;
+
+  @keyframes arrive {
+    from {
+      background-color: var(--color-sky-100);
+    }
+  }
+}
+
 * {
   box-sizing: border-box;
 }

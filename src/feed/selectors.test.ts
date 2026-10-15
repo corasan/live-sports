@@ -107,7 +107,7 @@ describe('selectVisibleGames', () => {
 
 describe('selectFeedRows', () => {
   it('lists every event at or above the minimum severity, newest first, without headers', () => {
-    const rows = selectFeedRows(feed, query({ severity: 'notable' }))
+    const rows = selectFeedRows(feed, query({ severity: 'notable' }), null)
     const expected = feedEvents(feed).filter((event) => event.severity !== 'info')
     expect(expected.length).toBeGreaterThan(0)
     expect(rows.every((row) => row.kind === 'event')).toBe(true)
@@ -116,7 +116,7 @@ describe('selectFeedRows', () => {
 
   it('heads each game section, orders sections by newest event, and keeps events newest-first', () => {
     const age = new Map(feedEvents(feed).map((event, index) => [event.id, index]))
-    const rows = selectFeedRows(feed, query({ group: 'game' }))
+    const rows = selectFeedRows(feed, query({ group: 'game' }), null)
     expect(rows[0].kind).toBe('group')
     const groups = sections(rows)
     expect(groups.length).toBeGreaterThan(1)
@@ -178,7 +178,7 @@ describe('selectFeedRows with a gap', () => {
   }
 
   it('places the gap between the events that arrived after the resync and those before it', () => {
-    const rows = selectFeedRows(gapped, DEFAULT_QUERY)
+    const rows = selectFeedRows(gapped, DEFAULT_QUERY, null)
     expect(eventsOf(rows)).toEqual(feedEvents(gapped))
     expect(newerCount(rows)).toBeGreaterThan(0)
     expect(gapPosition(rows)).toBe(newerCount(rows))
@@ -190,7 +190,7 @@ describe('selectFeedRows with a gap', () => {
   })
 
   it('repeats the gap inside each game section at that section’s own boundary', () => {
-    const rows = selectFeedRows(gapped, query({ group: 'game' }))
+    const rows = selectFeedRows(gapped, query({ group: 'game' }), null)
     const groups = splitAtGroups(rows)
     expect(groups.some((group) => newerCount(group) === 0)).toBe(true)
     expect(groups.some((group) => newerCount(group) === eventsOf(group).length)).toBe(true)
@@ -199,7 +199,7 @@ describe('selectFeedRows with a gap', () => {
   })
 
   it('steps selection across the gap row as if it were not there', () => {
-    const rows = selectFeedRows(gapped, DEFAULT_QUERY)
+    const rows = selectFeedRows(gapped, DEFAULT_QUERY, null)
     const ids = eventsOf(rows).map((event) => event.id)
     const boundary = gapPosition(rows)
     expect(stepSelection(rows, ids[boundary - 1], 1)).toEqual({
@@ -213,7 +213,86 @@ describe('selectFeedRows with a gap', () => {
   })
 
   it('still reports no matches when the filters exclude every event', () => {
-    expect(selectFeedView(gapped, query({ q: 'no team is called this' })).kind).toBe('no-matches')
+    expect(selectFeedView(gapped, query({ q: 'no team is called this' }), null).kind).toBe(
+      'no-matches',
+    )
+  })
+
+  it('puts a since divider at the same boundary below the gap', () => {
+    const rows = selectFeedRows(gapped, DEFAULT_QUERY, before.order.written)
+    const boundary = gapPosition(rows)
+    expect(boundary).toBe(newerCount(rows))
+    expect(rows[boundary + 1]).toEqual({ kind: 'since', key: 'since:all', count: boundary })
+  })
+})
+
+function sincePosition(rows: readonly FeedRow[]): number {
+  expect(rows.filter((row) => row.kind === 'since')).toHaveLength(1)
+  return rows.findIndex((row) => row.kind === 'since')
+}
+
+describe('selectFeedRows with a since mark', () => {
+  const { initial, batches } = simulate(7, 120)
+  const marked = ingestTicks(createFeed(initial), batches.slice(0, 30))
+  const live = ingestTicks(marked, batches.slice(30))
+  const since = marked.order.written
+
+  function newerCount(rows: readonly FeedRow[]): number {
+    return eventsOf(rows).filter((event) => !marked.events.has(event.id)).length
+  }
+
+  function straddles(rows: readonly FeedRow[]): boolean {
+    const newer = newerCount(rows)
+    return newer > 0 && newer < eventsOf(rows).length
+  }
+
+  it('places the divider right after the events newer than the mark, counting them', () => {
+    const rows = selectFeedRows(live, DEFAULT_QUERY, since)
+    expect(eventsOf(rows)).toEqual(feedEvents(live))
+    const newer = newerCount(rows)
+    expect(newer).toBeGreaterThan(0)
+    expect(newer).toBeLessThan(eventsOf(rows).length)
+    expect(rows[sincePosition(rows)]).toEqual({ kind: 'since', key: 'since:all', count: newer })
+    expect(sincePosition(rows)).toBe(newer)
+  })
+
+  it.each([
+    ['there is no mark', null],
+    ['no event is newer than the mark', live.order.written],
+    ['no event is older than the mark', 0],
+  ])('leaves the divider out when %s', (_, mark) => {
+    const rows = selectFeedRows(live, DEFAULT_QUERY, mark)
+    expect(rows.some((row) => row.kind === 'since')).toBe(false)
+    expect(eventsOf(rows)).toEqual(feedEvents(live))
+  })
+
+  it('gives each game section its own divider only where it has both newer and older events', () => {
+    const rows = selectFeedRows(live, query({ group: 'game' }), since)
+    const groups = splitAtGroups(rows)
+    expect(groups.some(straddles)).toBe(true)
+    expect(groups.some((group) => !straddles(group))).toBe(true)
+    for (const group of groups) {
+      const dividers = group.flatMap((row, index) =>
+        row.kind === 'since' ? [{ index, count: row.count }] : [],
+      )
+      const newer = newerCount(group)
+      expect(dividers).toEqual(straddles(group) ? [{ index: newer, count: newer }] : [])
+    }
+    expect(new Set(rows.map((row) => row.key)).size).toBe(rows.length)
+  })
+
+  it('steps selection across the divider as if it were not there', () => {
+    const rows = selectFeedRows(live, DEFAULT_QUERY, since)
+    const ids = eventsOf(rows).map((event) => event.id)
+    const boundary = sincePosition(rows)
+    expect(stepSelection(rows, ids[boundary - 1], 1)).toEqual({
+      id: ids[boundary],
+      index: boundary + 1,
+    })
+    expect(stepSelection(rows, ids[boundary], -1)).toEqual({
+      id: ids[boundary - 1],
+      index: boundary - 1,
+    })
   })
 })
 
@@ -224,7 +303,7 @@ describe('countNewEvents', () => {
   const live = ingestTicks(snapshot, batches.slice(split))
 
   function newVisibleIds(q: FeedQuery): EventId[] {
-    return eventsOf(selectFeedRows(live, q))
+    return eventsOf(selectFeedRows(live, q, null))
       .filter((event) => !snapshot.events.has(event.id))
       .map((event) => event.id)
   }
@@ -264,7 +343,7 @@ describe('memoization', () => {
 
   it.each([
     ['selectVisibleGames', (target: Feed, q: FeedQuery) => selectVisibleGames(target, q)],
-    ['selectFeedRows', (target: Feed, q: FeedQuery) => selectFeedRows(target, q)],
+    ['selectFeedRows', (target: Feed, q: FeedQuery) => selectFeedRows(target, q, null)],
   ])('%s returns the cached result until the feed or a query field changes', (_, select) => {
     const base = query({ teams: NBA })
     const first = select(before, base)
@@ -279,37 +358,41 @@ describe('selectFeedView', () => {
   const { initial } = simulate(7, 1)
 
   it('is loading until the first sync', () => {
-    expect(selectFeedView(createFeed(initial), DEFAULT_QUERY).kind).toBe('loading')
+    expect(selectFeedView(createFeed(initial), DEFAULT_QUERY, null).kind).toBe('loading')
   })
 
   it('shows a snapshot held before the first sync as empty rather than loading', () => {
-    expect(selectHeldView(createFeed(initial), DEFAULT_QUERY).kind).toBe('empty')
+    expect(selectHeldView(createFeed(initial), DEFAULT_QUERY, null).kind).toBe('empty')
   })
 
   it('shows a synced held snapshot the same as the live view', () => {
-    expect(selectHeldView(feed, DEFAULT_QUERY)).toBe(selectFeedView(feed, DEFAULT_QUERY))
+    expect(selectHeldView(feed, DEFAULT_QUERY, null)).toBe(
+      selectFeedView(feed, DEFAULT_QUERY, null),
+    )
   })
 
   it('is empty once synced with no events in the ring', () => {
     const synced = ingest(createFeed(initial), [], 0)
-    expect(selectFeedView(synced, DEFAULT_QUERY).kind).toBe('empty')
+    expect(selectFeedView(synced, DEFAULT_QUERY, null).kind).toBe('empty')
   })
 
   it('reports no matches when events exist but the filters exclude all of them', () => {
     expect(size(feed.order)).toBeGreaterThan(0)
-    expect(selectFeedView(feed, query({ q: 'no team is called this' })).kind).toBe('no-matches')
+    expect(selectFeedView(feed, query({ q: 'no team is called this' }), null).kind).toBe(
+      'no-matches',
+    )
   })
 
   it('lists the matching rows newest first', () => {
-    const view = selectFeedView(feed, DEFAULT_QUERY)
+    const view = selectFeedView(feed, DEFAULT_QUERY, null)
     expect(view.kind === 'rows' && eventsOf(view.rows)).toEqual(feedEvents(feed))
   })
 
   it('returns the same view across repeated calls and heartbeats', () => {
-    const first = selectFeedView(feed, query({ teams: NBA }))
+    const first = selectFeedView(feed, query({ teams: NBA }), null)
     expect(first.kind).toBe('rows')
-    expect(selectFeedView(feed, query({ teams: [...NBA] }))).toBe(first)
-    expect(selectFeedView(ingest(feed, [], Date.now()), query({ teams: NBA }))).toBe(first)
+    expect(selectFeedView(feed, query({ teams: [...NBA] }), null)).toBe(first)
+    expect(selectFeedView(ingest(feed, [], Date.now()), query({ teams: NBA }), null)).toBe(first)
   })
 })
 
@@ -415,7 +498,7 @@ describe('selectGameDetail', () => {
 })
 
 describe('stepSelection', () => {
-  const rows = selectFeedRows(feed, query({ group: 'game' }))
+  const rows = selectFeedRows(feed, query({ group: 'game' }), null)
   const ids = eventsOf(rows).map((event) => event.id)
   const headers = rows.filter((row) => row.kind === 'group').map((row) => row.key)
 
