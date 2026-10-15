@@ -215,7 +215,7 @@ function NewEventsPill({
   )
 }
 
-export function EventFeed({
+export const EventFeed = memo(function EventFeed({
   store,
   query,
   selected,
@@ -344,4 +344,4 @@ export function EventFeed({
       </div>
     </section>
   )
-}
+})

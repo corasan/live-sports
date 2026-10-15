@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, type ToggleEvent } from 'react'
+import { useId, useRef, type ToggleEvent } from 'react'
 import type { Severity } from '#/domain/event'
 import { LEAGUES } from '#/domain/game'
 import type { TeamId } from '#/domain/ids'
@@ -182,14 +182,16 @@ function Select<T extends string>({
   )
 }
 
-export function FeedControls({ query }: { query: FeedQuery }) {
+export function FeedControls({
+  query,
+  text,
+  onSearch,
+}: {
+  query: Omit<FeedQuery, 'q'>
+  text: string
+  onSearch: (q: string) => void
+}) {
   const update = useSearchPatch()
-  const search = useRef<HTMLInputElement>(null)
-  useEffect(() => {
-    const input = search.current
-    if (input === null || input === document.activeElement || input.value === query.q) return
-    input.value = query.q
-  }, [query.q])
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-6">
       <label className={`${FIELD} col-span-full lg:col-span-2`}>
@@ -205,12 +207,11 @@ export function FeedControls({ query }: { query: FeedQuery }) {
             />
           </svg>
           <input
-            ref={search}
             type="search"
             className={`${CONTROL} pr-3 pl-9 placeholder:text-slate-400`}
-            defaultValue={query.q}
+            value={text}
             placeholder="Team name"
-            onChange={(event) => update({ q: event.target.value })}
+            onChange={(event) => onSearch(event.target.value)}
           />
         </span>
       </label>
