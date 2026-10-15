@@ -46,7 +46,6 @@
   "engines": {
     "node": ">=22"
   },
-  "packageManager": "bun@1.4.2",
   "trustedDependencies": [
     "esbuild",
     "lightningcss"
