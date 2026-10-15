@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import { useStore } from 'zustand'
 import type { GameId } from '#/domain/ids'
 import type { FeedStore } from '#/feed/store'
@@ -44,7 +45,7 @@ function ScoreboardSkeleton({ store }: { store: FeedStore }) {
   )
 }
 
-export function Scoreboard({
+export const Scoreboard = memo(function Scoreboard({
   store,
   query,
   selected,
@@ -96,4 +97,4 @@ export function Scoreboard({
       })}
     </ul>
   )
-}
+})
