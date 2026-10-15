@@ -1,7 +1,7 @@
 import type { GameEvent, Severity } from '#/domain/event'
 import { matchupLabel, type Game, type GameStatus, type League } from '#/domain/game'
 import { parseEventId, parseGameId, type EventId, type GameId, type TeamId } from '#/domain/ids'
-import { ROSTER, ROSTERS } from '#/sim/roster'
+import { ROSTER, ROSTERS } from '#/domain/roster'
 import { eventAt, lookup, type Feed } from './feed'
 import { memoizeLast } from './memo'
 import { size, type Ring } from './ring'

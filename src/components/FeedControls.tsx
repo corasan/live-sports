@@ -14,7 +14,7 @@ import {
   type FeedQuery,
   type GameSort,
 } from '#/feed/view'
-import { ROSTER, ROSTERS } from '#/sim/roster'
+import { ROSTER, ROSTERS } from '#/domain/roster'
 import { useSearchPatch } from './useSearchPatch'
 
 const SEVERITY_LABEL: Readonly<Record<Severity, string>> = {

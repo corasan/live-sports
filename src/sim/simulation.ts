@@ -3,7 +3,7 @@ import { applyEvent, leaderOf, LEAGUES, type Game, type League, type Odds } from
 import { eventId, gameId, type GameId, type TeamId } from '#/domain/ids'
 import { LEAGUE_RULES, type LeagueRules, type MarketRules, type PlayKind } from './leagues'
 import { createRng, type Rng } from './rng'
-import { ROSTERS } from './roster'
+import { ROSTERS } from '#/domain/roster'
 import { severityOf } from './severity'
 
 export type SimGame = {

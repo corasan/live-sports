@@ -16,7 +16,6 @@ export type LeagueRules = {
   readonly games: number
   readonly periods: number
   readonly ticksPerPeriod: number
-  readonly teams: readonly string[]
   readonly scoring: NonEmpty<Weighted<number>>
   readonly plays: NonEmpty<Weighted<PlayKind>>
   readonly markets: Readonly<Record<Market, MarketRules>>
@@ -29,14 +28,6 @@ export const LEAGUE_RULES: Readonly<Record<League, LeagueRules>> = {
     games: 3,
     periods: 4,
     ticksPerPeriod: 12,
-    teams: [
-      'Harbor Hawks',
-      'Mesa Comets',
-      'Granite Bears',
-      'Delta Herons',
-      'Summit Owls',
-      'Cobalt Kings',
-    ],
     scoring: [
       { weight: 6, value: 2 },
       { weight: 3, value: 3 },
@@ -58,7 +49,6 @@ export const LEAGUE_RULES: Readonly<Record<League, LeagueRules>> = {
     games: 2,
     periods: 4,
     ticksPerPeriod: 12,
-    teams: ['River Rams', 'Iron Foxes', 'Prairie Bison', 'Coastal Marlins'],
     scoring: [
       { weight: 5, value: 7 },
       { weight: 3, value: 3 },
@@ -81,14 +71,6 @@ export const LEAGUE_RULES: Readonly<Record<League, LeagueRules>> = {
     games: 3,
     periods: 3,
     ticksPerPeriod: 15,
-    teams: [
-      'Glacier Wolves',
-      'Northern Lynx',
-      'Copper Stags',
-      'Lakeside Pike',
-      'Timber Ravens',
-      'Frost Giants',
-    ],
     scoring: [{ weight: 1, value: 1 }],
     plays: [
       { weight: 0.6, value: 'score' },
