@@ -7,6 +7,7 @@ import {
   GAME_SORT_OPTIONS,
   leagueSelection,
   parseOption,
+  pickedTeams,
   SEVERITIES,
   toggleLeague,
   toggleTeam,
@@ -47,7 +48,7 @@ function selectionLabel(teams: readonly TeamId[]): string {
   const parts = LEAGUES.flatMap((league) =>
     leagueSelection(teams, league) === 'all'
       ? [league]
-      : ROSTERS[league].filter((team) => teams.includes(team.id)).map((team) => team.name),
+      : pickedTeams(teams, league).map((team) => team.name),
   )
   return parts.length <= 2 ? parts.join(', ') : `${teams.length} teams`
 }

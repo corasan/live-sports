@@ -1,5 +1,5 @@
 import type { GameEvent, Severity } from '#/domain/event'
-import { matchupLabel, type Game, type GameStatus, type League } from '#/domain/game'
+import { matchupLabel, type Game, type GameStatus, type League, type Team } from '#/domain/game'
 import { parseEventId, parseGameId, type EventId, type GameId, type TeamId } from '#/domain/ids'
 import { ROSTER, ROSTERS } from '#/domain/roster'
 import { eventAt, lookup, type Feed } from './feed'
@@ -142,8 +142,12 @@ export function normalizeTeams(ids: Iterable<unknown>): readonly TeamId[] {
   return ROSTER.filter((team) => wanted.has(team.id)).map((team) => team.id)
 }
 
+export function pickedTeams(teams: readonly TeamId[], league: League): readonly Team[] {
+  return ROSTERS[league].filter((team) => teams.includes(team.id))
+}
+
 export function leagueSelection(teams: readonly TeamId[], league: League): LeagueSelection {
-  const picked = ROSTERS[league].filter((team) => teams.includes(team.id)).length
+  const picked = pickedTeams(teams, league).length
   if (picked === 0) return 'none'
   return picked === ROSTERS[league].length ? 'all' : 'some'
 }
