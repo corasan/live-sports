@@ -90,8 +90,8 @@ export function FeedControls({ query }: { query: FeedQuery }) {
     input.value = query.q
   }, [query.q])
   return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-[minmax(14rem,2fr)_repeat(4,minmax(0,1fr))]">
-      <label className={`${FIELD} col-span-full lg:col-span-1`}>
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-6">
+      <label className={`${FIELD} col-span-full lg:col-span-2`}>
         Search teams
         <span className="relative">
           <svg viewBox="0 0 16 16" fill="none" aria-hidden className={`${ICON} left-3`}>
