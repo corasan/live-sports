@@ -14,7 +14,7 @@ import {
   type EventGrouping,
   type FeedQuery,
   type GameSort,
-} from '#/feed/view'
+} from '#/feed/query'
 import { ROSTER, ROSTERS } from '#/domain/roster'
 import { useSearchPatch } from './useSearchPatch'
 

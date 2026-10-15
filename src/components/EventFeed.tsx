@@ -14,15 +14,14 @@ import { matchupLabel } from '#/domain/game'
 import type { EventId } from '#/domain/ids'
 import type { Feed, Gap } from '#/feed/feed'
 import type { FeedStore } from '#/feed/store'
+import { clearFilters, type FeedQuery } from '#/feed/query'
 import {
-  clearFilters,
   countNewEvents,
   selectFeedView,
   selectHeldView,
   stepSelection,
-  type FeedQuery,
   type FeedRow,
-} from '#/feed/view'
+} from '#/feed/selectors'
 import { clockTime, describeEvent, eventTime, SEVERITY_STYLE, type Matchup } from './describeEvent'
 import { isPlainKeypress } from './keys'
 import { BUTTON, SELECTED_STYLE } from './styles'

@@ -1,5 +1,6 @@
 import type { FeedStore } from '#/feed/store'
-import { selectionSearch, type FeedQuery, type RelatedScope, type Selection } from '#/feed/view'
+import type { FeedQuery } from '#/feed/query'
+import { selectionSearch, type RelatedScope, type Selection } from '#/feed/selection'
 import { useSimulation } from '#/sim/useSimulation'
 import { EventDetailPanel } from './EventDetailPanel'
 import { EventFeed } from './EventFeed'

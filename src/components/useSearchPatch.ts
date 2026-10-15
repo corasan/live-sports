@@ -1,6 +1,6 @@
 import { useNavigate } from '@tanstack/react-router'
 import { useCallback } from 'react'
-import { selectionSearch, type Selection } from '#/feed/view'
+import { selectionSearch, type Selection } from '#/feed/selection'
 import type { HomeSearch } from '#/routes/index'
 
 export function useSearchPatch(): (patch: Partial<HomeSearch>) => void {
