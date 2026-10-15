@@ -1,18 +1,9 @@
-import {
-  severityOf,
-  type EventKind,
-  type EventOf,
-  type GameEvent,
-  type Reason,
-  type Score,
-} from '#/domain/event'
+import { severityOf, type GameEvent, type Reason } from '#/domain/event'
 import type { Game } from '#/domain/game'
-import { clockTime, describeEvent, SEVERITY_STYLE } from './describeEvent'
+import { describeEvent, eventTime, scoreLabel, SEVERITY_STYLE } from './describeEvent'
 import { marketDelta, statusLabel } from './gameLabels'
 
 type Fact = { readonly label: string; readonly value: string }
-
-type KindFacts = { readonly [K in EventKind]: (event: EventOf<K>) => readonly Fact[] }
 
 const REASON_TEXT: Readonly<Record<Reason, string>> = {
   routine: 'Routine play',
@@ -25,38 +16,27 @@ const REASON_TEXT: Readonly<Record<Reason, string>> = {
   final: 'The game is over',
 }
 
-function scoreLabel(score: Score): string {
-  return `${score.away}-${score.home}`
-}
-
-const scoreAtEvent = (event: GameEvent): readonly Fact[] => [
-  { label: 'Score', value: scoreLabel(event.before.score) },
-]
-
-const KIND_FACTS: KindFacts = {
-  game_started: scoreAtEvent,
-  score: (event) => [
-    { label: 'Score', value: `${scoreLabel(event.before.score)} → ${scoreLabel(event.score)}` },
-  ],
-  lead_change: scoreAtEvent,
-  period_ended: scoreAtEvent,
-  injury: scoreAtEvent,
-  odds_shift: (event) => [
-    ...scoreAtEvent(event),
-    { label: 'Move', value: marketDelta(event.market, event.from, event.to) },
-  ],
-  game_ended: scoreAtEvent,
-  game_scheduled: (event) => [{ label: 'Replaces', value: event.replaces }],
-}
-
-function kindFacts<K extends EventKind>(event: EventOf<K>): readonly Fact[] {
-  const facts: (event: EventOf<K>) => readonly Fact[] = KIND_FACTS[event.kind]
-  return facts(event)
+function kindFacts(event: GameEvent): readonly Fact[] {
+  switch (event.kind) {
+    case 'score':
+      return [
+        { label: 'Score', value: `${scoreLabel(event.before.score)} → ${scoreLabel(event.score)}` },
+      ]
+    case 'odds_shift':
+      return [
+        { label: 'Score', value: scoreLabel(event.before.score) },
+        { label: 'Move', value: marketDelta(event.market, event.from, event.to) },
+      ]
+    case 'game_scheduled':
+      return [{ label: 'Replaces', value: event.replaces }]
+    default:
+      return [{ label: 'Score', value: scoreLabel(event.before.score) }]
+  }
 }
 
 export function EventDetail({ event, game }: { event: GameEvent; game: Game }) {
   const facts: readonly Fact[] = [
-    { label: 'Time', value: clockTime(event.ts) },
+    { label: 'Time', value: eventTime(event) },
     { label: 'Game', value: statusLabel(game.league, event.before) },
     ...kindFacts(event),
     { label: 'Why', value: REASON_TEXT[event.reason] },

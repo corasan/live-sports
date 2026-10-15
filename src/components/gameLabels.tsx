@@ -1,7 +1,7 @@
-import type { Market } from '#/domain/event'
-import { PERIOD_PREFIX, type Game, type GameStatus as Status, type League } from '#/domain/game'
+import type { Market, Moment } from '#/domain/event'
+import { PERIOD_PREFIX, type Game, type League } from '#/domain/game'
 
-export function statusLabel(league: League, moment: Status): string {
+export function statusLabel(league: League, moment: Moment): string {
   switch (moment.status) {
     case 'scheduled':
       return 'Scheduled'
@@ -27,14 +27,9 @@ function signed(value: number): string {
   return value > 0 ? `+${value}` : `${value}`
 }
 
-const MARKET_DELTA: Readonly<Record<Market, (delta: number) => string>> = {
-  moneyline: (delta) => `${signed(delta)}%`,
-  spread: signed,
-  total: signed,
-}
-
 export function marketDelta(market: Market, from: number, to: number): string {
-  return MARKET_DELTA[market](to - from)
+  const delta = signed(to - from)
+  return market === 'moneyline' ? `${delta}%` : delta
 }
 
 const SCORE_UNIT: Readonly<Record<League, { readonly one: string; readonly many: string }>> = {

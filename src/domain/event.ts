@@ -17,7 +17,7 @@ export type Reason =
   | 'injury'
   | 'final'
 
-export const REASON_SEVERITY: Readonly<Record<Reason, Severity>> = {
+const REASON_SEVERITY: Readonly<Record<Reason, Severity>> = {
   routine: 'info',
   go_ahead: 'notable',
   late_go_ahead: 'critical',

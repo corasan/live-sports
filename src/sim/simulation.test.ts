@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { GameEvent } from '#/domain/event'
-import { applyEvent, leaderOf, statusOf, type Game } from '#/domain/game'
+import { applyEvent, leaderOf, momentOf, type Game } from '#/domain/game'
 import type { GameId, TeamId } from '#/domain/ids'
 import { createSimulation, step, type SimState } from './simulation'
 
@@ -104,7 +104,7 @@ describe.each(SEEDS)('a rolling slate with seed %i', (seed) => {
   it('records the game as it stood just before each event', () => {
     for (const { start, events: stream } of streams.values()) {
       stream.reduce((game, event) => {
-        expect(event.before).toEqual({ ...statusOf(game), score: game.score })
+        expect(event.before).toEqual(momentOf(game))
         return applyEvent(game, event)
       }, start)
     }

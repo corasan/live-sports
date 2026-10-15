@@ -105,8 +105,8 @@ function eventMatcher(
 ): (event: GameEvent) => boolean {
   const matches = gameMatcher(teams, q)
   const visible = new Set([...games.values()].filter(matches).map((game) => game.id))
-  return (event) =>
-    SEVERITY_RANK[severityOf(event)] >= SEVERITY_RANK[severity] && visible.has(event.gameId)
+  const minimum = SEVERITY_RANK[severity]
+  return (event) => SEVERITY_RANK[severityOf(event)] >= minimum && visible.has(event.gameId)
 }
 
 const feedRows = memoizeLast(

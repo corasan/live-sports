@@ -3,7 +3,7 @@ import {
   applyEvent,
   leaderOf,
   LEAGUES,
-  statusOf,
+  momentOf,
   type Game,
   type League,
   type Odds,
@@ -96,7 +96,7 @@ export function step(state: SimState, now: number): StepResult {
       ts: now,
       gameId: game.id,
       reason: reasonFor(draft, game, rules),
-      before: { ...statusOf(game), score: game.score },
+      before: momentOf(game),
     }
     events.push(event)
     return event

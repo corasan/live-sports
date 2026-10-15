@@ -1,4 +1,4 @@
-import type { GameEvent, Market, Score } from './event'
+import type { GameEvent, Market, Moment, Score } from './event'
 import type { GameId, TeamId } from './ids'
 
 export const LEAGUES = ['NBA', 'NFL', 'NHL'] as const
@@ -29,14 +29,10 @@ export function matchupLabel(game: Pick<Game, 'home' | 'away'>): string {
   return `${game.away.name} @ ${game.home.name}`
 }
 
-export function statusOf(game: GameStatus): GameStatus {
-  switch (game.status) {
-    case 'live':
-      return { status: 'live', period: game.period }
-    case 'scheduled':
-    case 'final':
-      return { status: game.status }
-  }
+export function momentOf(game: Game): Moment {
+  return game.status === 'live'
+    ? { status: 'live', period: game.period, score: game.score }
+    : { status: game.status, score: game.score }
 }
 
 export function leaderOf(game: Game, score: Score): TeamId | null {
