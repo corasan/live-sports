@@ -1,48 +1,12 @@
 import type { GameEvent, Severity } from '#/domain/event'
-import { matchupLabel, type Game, type GameStatus, type League, type Team } from '#/domain/game'
-import { parseEventId, parseGameId, type EventId, type GameId, type TeamId } from '#/domain/ids'
-import { ROSTER, ROSTERS } from '#/domain/roster'
+import { matchupLabel, type Game, type GameStatus } from '#/domain/game'
+import type { EventId, GameId, TeamId } from '#/domain/ids'
 import { eventAt, lookup, type Feed, type Gap } from './feed'
 import { memoizeLast } from './memo'
+import type { EventGrouping, FeedQuery, GameSort, RelatedScope } from './query'
 import { at, size, type Ring } from './ring'
 
-export const SEVERITIES = ['info', 'notable', 'critical'] as const satisfies readonly Severity[]
-export const GAME_SORT_OPTIONS = ['schedule', 'closest', 'league'] as const
-export const EVENT_GROUPINGS = ['none', 'game', 'league'] as const
-export const RELATED_SCOPES = ['game', 'drive'] as const
-
-export type GameSort = (typeof GAME_SORT_OPTIONS)[number]
-export type EventGrouping = (typeof EVENT_GROUPINGS)[number]
-export type RelatedScope = (typeof RELATED_SCOPES)[number]
-
-export type FeedQuery = {
-  readonly teams: readonly TeamId[]
-  readonly severity: Severity
-  readonly q: string
-  readonly sort: GameSort
-  readonly group: EventGrouping
-}
-
-export const DEFAULT_QUERY: FeedQuery = {
-  teams: [],
-  severity: 'info',
-  q: '',
-  sort: 'schedule',
-  group: 'none',
-}
-
-export const DEFAULT_RELATED: RelatedScope = 'game'
-
 export type DriveSpan = { readonly start: number; readonly end: number }
-
-export type Selection =
-  | { readonly kind: 'event'; readonly id: EventId }
-  | { readonly kind: 'game'; readonly id: GameId }
-
-export type SelectionSearch = {
-  readonly event: EventId | undefined
-  readonly game: GameId | undefined
-}
 
 type Missing = { readonly kind: 'missing' }
 
@@ -65,8 +29,6 @@ export type GameDetail =
       readonly timeline: readonly GameEvent[]
       readonly recent: readonly GameEvent[]
     }
-
-export type Step = { readonly id: EventId; readonly index: number }
 
 export type FeedRow =
   | { readonly kind: 'group'; readonly key: string; readonly label: string }
@@ -115,56 +77,6 @@ const IN_SCOPE: Readonly<Record<RelatedScope, (selected: GameEvent, other: GameE
     game: () => true,
     drive: (selected, other) => other.drive === selected.drive,
   }
-
-export function parseOption<T extends string>(
-  options: readonly T[],
-  raw: string | undefined,
-  fallback: T,
-): T {
-  return options.find((option) => option === raw) ?? fallback
-}
-
-type RawFeedQuery = Readonly<
-  Partial<Record<Exclude<keyof FeedQuery, 'teams'>, string>> & { teams?: unknown }
->
-
-export function parseFeedQuery(raw: RawFeedQuery): FeedQuery {
-  return {
-    teams: Array.isArray(raw.teams) ? normalizeTeams(raw.teams) : DEFAULT_QUERY.teams,
-    severity: parseOption(SEVERITIES, raw.severity, DEFAULT_QUERY.severity),
-    q: raw.q ?? DEFAULT_QUERY.q,
-    sort: parseOption(GAME_SORT_OPTIONS, raw.sort, DEFAULT_QUERY.sort),
-    group: parseOption(EVENT_GROUPINGS, raw.group, DEFAULT_QUERY.group),
-  }
-}
-
-type LeagueSelection = 'all' | 'some' | 'none'
-
-function normalizeTeams(ids: Iterable<unknown>): readonly TeamId[] {
-  const wanted = new Set(ids)
-  return ROSTER.filter((team) => wanted.has(team.id)).map((team) => team.id)
-}
-
-export function pickedTeams(teams: readonly TeamId[], league: League): readonly Team[] {
-  return ROSTERS[league].filter((team) => teams.includes(team.id))
-}
-
-export function leagueSelection(teams: readonly TeamId[], league: League): LeagueSelection {
-  const picked = pickedTeams(teams, league).length
-  if (picked === 0) return 'none'
-  return picked === ROSTERS[league].length ? 'all' : 'some'
-}
-
-export function toggleTeam(teams: readonly TeamId[], id: TeamId): readonly TeamId[] {
-  return teams.includes(id) ? teams.filter((other) => other !== id) : normalizeTeams([...teams, id])
-}
-
-export function toggleLeague(teams: readonly TeamId[], league: League): readonly TeamId[] {
-  const ids = ROSTERS[league].map((team) => team.id)
-  return leagueSelection(teams, league) === 'all'
-    ? teams.filter((id) => !ids.includes(id))
-    : normalizeTeams([...teams, ...ids])
-}
 
 function gameMatcher(teams: readonly TeamId[], q: string): (game: Game) => boolean {
   const needle = q.trim().toLowerCase()
@@ -259,23 +171,6 @@ export function selectFeedRows(feed: Feed, query: FeedQuery): readonly FeedRow[]
   )
 }
 
-export function parseSelection(raw: {
-  readonly event?: string
-  readonly game?: string
-}): Selection | undefined {
-  const event = raw.event === undefined ? undefined : parseEventId(raw.event)
-  if (event !== undefined) return { kind: 'event', id: event }
-  const game = raw.game === undefined ? undefined : parseGameId(raw.game)
-  return game === undefined ? undefined : { kind: 'game', id: game }
-}
-
-export function selectionSearch(selection: Selection | undefined): SelectionSearch {
-  return {
-    event: selection?.kind === 'event' ? selection.id : undefined,
-    game: selection?.kind === 'game' ? selection.id : undefined,
-  }
-}
-
 function gameEventsNewestFirst(
   events: ReadonlyMap<EventId, GameEvent>,
   order: Ring<EventId>,
@@ -335,21 +230,6 @@ export function selectGameDetail(feed: Feed, id: GameId): GameDetail {
   return gameDetail(feed.events, feed.order, feed.games, id)
 }
 
-export function stepSelection(
-  rows: readonly FeedRow[],
-  selected: EventId | undefined,
-  delta: 1 | -1,
-): Step | null {
-  const current = selected === undefined ? -1 : rows.findIndex((row) => row.key === selected)
-  const direction = current === -1 ? 1 : delta
-  for (let index = current + direction; index >= 0 && index < rows.length; index += direction) {
-    const row = rows[index]
-    if (row.kind === 'event') return { id: row.key, index }
-  }
-  const stay = rows.at(current)
-  return current !== -1 && stay?.kind === 'event' ? { id: stay.key, index: current } : null
-}
-
 const newEventCount = memoizeLast(
   (
     feed: Feed,
@@ -394,9 +274,4 @@ export function selectFeedView(feed: Feed, query: FeedQuery): FeedView {
 export function selectHeldView(snapshot: Feed, query: FeedQuery): FeedView {
   const view = selectFeedView(snapshot, query)
   return view === LOADING ? EMPTY : view
-}
-
-export function clearFilters(query: FeedQuery): FeedQuery {
-  const { teams, severity, q } = DEFAULT_QUERY
-  return { ...query, teams, severity, q }
 }

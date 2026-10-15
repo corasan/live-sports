@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { parseOption } from '#/feed/view'
+import { parseOption } from '#/feed/query'
 import { BUTTON } from './styles'
 
 const OUTAGE_DURATIONS = ['5s', '15s', '30s'] as const

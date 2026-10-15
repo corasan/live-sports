@@ -5,13 +5,11 @@ import {
   DEFAULT_RELATED,
   parseFeedQuery,
   parseOption,
-  parseSelection,
   RELATED_SCOPES,
-  selectionSearch,
   type FeedQuery,
   type RelatedScope,
-  type SelectionSearch,
-} from '#/feed/view'
+} from '#/feed/query'
+import { parseSelection, selectionSearch, type SelectionSearch } from '#/feed/selection'
 import { parseSeed } from '#/sim/seed'
 
 export type HomeSearch = FeedQuery &

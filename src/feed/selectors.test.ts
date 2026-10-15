@@ -1,31 +1,23 @@
 import { describe, expect, it } from 'vitest'
 import type { GameEvent } from '#/domain/event'
 import type { Game } from '#/domain/game'
-import { eventId, gameId, type EventId, type TeamId } from '#/domain/ids'
+import { eventId, gameId, type EventId } from '#/domain/ids'
 import { ROSTERS } from '#/domain/roster'
 import { createFeed, ingest, receive, type Feed } from './feed'
 import { feedEvents, gamesOf, ingestTicks, simulate, simulatedFeed, TICK_MS } from './fixtures'
 import { size } from './ring'
+import { DEFAULT_QUERY, toggleLeague, type FeedQuery, type RelatedScope } from './query'
 import {
-  clearFilters,
   countNewEvents,
-  DEFAULT_QUERY,
-  leagueSelection,
-  parseFeedQuery,
-  parseSelection,
   selectEventDetail,
   selectGameDetail,
   selectFeedRows,
   selectFeedView,
   selectHeldView,
   selectVisibleGames,
-  stepSelection,
-  toggleLeague,
-  toggleTeam,
-  type FeedQuery,
   type FeedRow,
-  type RelatedScope,
-} from './view'
+} from './selectors'
+import { stepSelection } from './selection'
 
 const { feed, events: emitted } = simulatedFeed(7, 120, 20_000)
 
@@ -320,66 +312,6 @@ describe('selectFeedView', () => {
   })
 })
 
-describe('clearFilters', () => {
-  it('resets teams, severity, and search but keeps sort and grouping', () => {
-    const cleared = clearFilters({
-      teams: NBA,
-      severity: 'critical',
-      q: 'hawks',
-      sort: 'closest',
-      group: 'game',
-    })
-    expect(cleared).toEqual({ ...DEFAULT_QUERY, sort: 'closest', group: 'game' })
-  })
-})
-
-describe('parseFeedQuery', () => {
-  it('keeps valid fields and falls back per field for the rest', () => {
-    expect(
-      parseFeedQuery({ teams: [NBA[0]], severity: 'loud', q: 'hawks', sort: 'closest' }),
-    ).toEqual({ teams: [NBA[0]], severity: 'info', q: 'hawks', sort: 'closest', group: 'none' })
-  })
-
-  it('keeps only known team ids, deduped in roster order', () => {
-    const nhl = ROSTERS.NHL[0].id
-    expect(parseFeedQuery({ teams: [nhl, 'nba-nobody', NBA[2], 7, NBA[0], nhl] }).teams).toEqual([
-      NBA[0],
-      NBA[2],
-      nhl,
-    ])
-  })
-
-  it.each([['nba-harbor-hawks'], [{ 0: NBA[0] }], [null], [undefined]])(
-    'falls back to no teams for %j',
-    (teams) => {
-      expect(parseFeedQuery({ teams }).teams).toEqual([])
-    },
-  )
-})
-
-describe('team selection', () => {
-  it('reports a sport as all, some, or none of its teams picked', () => {
-    expect(leagueSelection([], 'NBA')).toBe('none')
-    expect(leagueSelection([NBA[1]], 'NBA')).toBe('some')
-    expect(leagueSelection(NBA, 'NBA')).toBe('all')
-    expect(leagueSelection(NBA, 'NFL')).toBe('none')
-  })
-
-  it('completes a partly picked sport, then clears it without touching other teams', () => {
-    const nfl: TeamId = ROSTERS.NFL[1].id
-    const partial = [NBA[3], nfl]
-    const full = toggleLeague(partial, 'NBA')
-    expect(full).toEqual([...NBA, nfl])
-    expect(toggleLeague(full, 'NBA')).toEqual([nfl])
-  })
-
-  it('adds a team in roster order and removes it on the second toggle', () => {
-    const added = toggleTeam([NBA[3]], NBA[1])
-    expect(added).toEqual([NBA[1], NBA[3]])
-    expect(toggleTeam(added, NBA[3])).toEqual([NBA[1]])
-  })
-})
-
 describe('selectEventDetail', () => {
   const selected = emitted.find((event) => {
     const peers = emitted.filter((other) => other.gameId === event.gameId)
@@ -478,59 +410,5 @@ describe('selectGameDetail', () => {
     const later = ingestTicks(feed, simulate(7, 140).batches.slice(120))
     expect(size(later.order)).toBeGreaterThan(size(feed.order))
     expect(selectGameDetail(later, selected)).not.toBe(first)
-  })
-})
-
-describe('parseSelection', () => {
-  const event = eventId(12)
-  const game = gameId('nba-3')
-
-  it('parses a single event or game selection', () => {
-    expect(parseSelection({ event })).toEqual({ kind: 'event', id: event })
-    expect(parseSelection({ game })).toEqual({ kind: 'game', id: game })
-  })
-
-  it('prefers the event when both arrive', () => {
-    expect(parseSelection({ event, game })).toEqual({ kind: 'event', id: event })
-  })
-
-  it('ignores malformed and missing ids', () => {
-    expect(parseSelection({})).toBeUndefined()
-    expect(parseSelection({ event: 'nope', game: 'Not A Slug' })).toBeUndefined()
-    expect(parseSelection({ event: '42', game: 'nba-3' })).toEqual({ kind: 'game', id: game })
-  })
-})
-
-describe('stepSelection', () => {
-  const rows = selectFeedRows(feed, query({ group: 'game' }))
-  const ids = eventsOf(rows).map((event) => event.id)
-  const headers = rows.filter((row) => row.kind === 'group').map((row) => row.key)
-
-  it('starts at the first event row in either direction when nothing is selected', () => {
-    expect(rows[0].kind).toBe('group')
-    expect(stepSelection(rows, undefined, 1)).toEqual({ id: ids[0], index: 1 })
-    expect(stepSelection(rows, undefined, -1)?.id).toBe(ids[0])
-    expect(stepSelection(rows, eventId(999_999), -1)?.id).toBe(ids[0])
-  })
-
-  it('walks every event row in order, skipping group headers', () => {
-    const visited = [ids[0]]
-    for (let i = 1; i < ids.length; i++) {
-      const step = stepSelection(rows, visited[i - 1], 1)
-      expect(step === null ? null : rows[step.index].key).toBe(step?.id)
-      visited.push(step?.id ?? ids[0])
-    }
-    expect(visited).toEqual(ids)
-    expect(headers.length).toBeGreaterThan(1)
-  })
-
-  it('clamps at both ends instead of wrapping', () => {
-    expect(stepSelection(rows, ids[0], -1)?.id).toBe(ids[0])
-    expect(stepSelection(rows, ids.at(-1), 1)?.id).toBe(ids.at(-1))
-  })
-
-  it('selects nothing when there are no event rows', () => {
-    expect(stepSelection([], undefined, 1)).toBeNull()
-    expect(stepSelection([{ kind: 'group', key: 'group:x', label: 'X' }], ids[0], -1)).toBeNull()
   })
 })
