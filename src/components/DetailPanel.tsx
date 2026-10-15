@@ -7,7 +7,7 @@ import { describeEvent, eventTime, SEVERITY_DOT, SEVERITY_STYLE } from './descri
 import { isPlainKeypress } from './keys'
 import { useSelect } from './useSearchPatch'
 
-export type TimelineFocus = { readonly event: EventId; readonly driveSpan: DriveSpan }
+type TimelineFocus = { readonly event: EventId; readonly driveSpan: DriveSpan }
 
 export function MiniTimeline({
   timeline,

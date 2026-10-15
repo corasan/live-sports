@@ -121,7 +121,7 @@ export function parseOption<T extends string>(
   return options.find((option) => option === raw) ?? fallback
 }
 
-export type RawFeedQuery = Readonly<
+type RawFeedQuery = Readonly<
   Partial<Record<Exclude<keyof FeedQuery, 'teams'>, string>> & { teams?: unknown }
 >
 
@@ -135,9 +135,9 @@ export function parseFeedQuery(raw: RawFeedQuery): FeedQuery {
   }
 }
 
-export type LeagueSelection = 'all' | 'some' | 'none'
+type LeagueSelection = 'all' | 'some' | 'none'
 
-export function normalizeTeams(ids: Iterable<unknown>): readonly TeamId[] {
+function normalizeTeams(ids: Iterable<unknown>): readonly TeamId[] {
   const wanted = new Set(ids)
   return ROSTER.filter((team) => wanted.has(team.id)).map((team) => team.id)
 }
