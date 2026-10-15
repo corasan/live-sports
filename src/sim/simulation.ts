@@ -1,7 +1,7 @@
 import type { EventDraft, GameEvent, Market } from '#/domain/event'
-import { applyEvent, leaderOf, type Game, type League, type Odds } from '#/domain/game'
+import { applyEvent, leaderOf, LEAGUES, type Game, type League, type Odds } from '#/domain/game'
 import { eventId, gameId, teamId, type TeamId } from '#/domain/ids'
-import { LEAGUE_RULES, LEAGUES, type LeagueRules, type MarketRules, type PlayKind } from './leagues'
+import { LEAGUE_RULES, type LeagueRules, type MarketRules, type PlayKind } from './leagues'
 import { createRng, type Rng } from './rng'
 import { severityOf } from './severity'
 

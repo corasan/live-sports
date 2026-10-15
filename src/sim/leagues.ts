@@ -24,8 +24,6 @@ export type LeagueRules = {
 
 const MONEYLINE: MarketRules = { min: 5, max: 95, unit: 1, maxUnits: 8, notableShift: 6 }
 
-export const LEAGUES = ['NBA', 'NFL', 'NHL'] as const satisfies readonly League[]
-
 export const LEAGUE_RULES: Readonly<Record<League, LeagueRules>> = {
   NBA: {
     games: 3,

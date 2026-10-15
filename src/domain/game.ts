@@ -1,7 +1,9 @@
 import type { GameEvent, Market, Score } from './event'
 import type { GameId, TeamId } from './ids'
 
-export type League = 'NBA' | 'NFL' | 'NHL'
+export const LEAGUES = ['NBA', 'NFL', 'NHL'] as const
+
+export type League = (typeof LEAGUES)[number]
 
 export type Team = { readonly id: TeamId; readonly name: string }
 
@@ -19,6 +21,10 @@ export type Game = GameStatus & {
   readonly away: Team
   readonly score: Score
   readonly odds: Odds
+}
+
+export function matchupLabel(game: Pick<Game, 'home' | 'away'>): string {
+  return `${game.away.name} @ ${game.home.name}`
 }
 
 export function leaderOf(game: Game, score: Score): TeamId | null {

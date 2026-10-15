@@ -37,15 +37,11 @@ export function ingest(feed: Feed, batch: readonly GameEvent[]): Feed {
   return { games, gameIds: feed.gameIds, events, order: ring }
 }
 
-export function gamesOf(feed: Feed): Game[] {
-  return feed.gameIds.map((id) => lookup(feed.games, id))
-}
-
 export function eventAt(feed: Pick<Feed, 'events' | 'order'>, index: number): GameEvent {
   return lookup(feed.events, at(feed.order, index))
 }
 
-function lookup<K, V>(map: ReadonlyMap<K, V>, key: K): V {
+export function lookup<K, V>(map: ReadonlyMap<K, V>, key: K): V {
   const value = map.get(key)
   if (value === undefined) throw new Error(`Feed is missing ${String(key)}`)
   return value
