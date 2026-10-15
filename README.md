@@ -63,11 +63,13 @@ These are some of the decisions/notes I used to write my prompts:
 - the 20k cap and the 350ms buffer are not measured, these numbers would be tuned with real profiling.
 
 ## AI & Tools
+
 - I added the pstack plugin to the repo because I wanted to work as close as possible to how I would approach real work, I start my prompts with `/poteto-mode`. Pstack was overkill and the agent didn't really use the whole skillset because of how small the repo is so there was no real benefit, just showing how I use AI tools a bit more.
 - Same with anti-slop oxlint rules. These are helpful to steer the agent into writing better code. I left the Effect rules in because I would normally use Effect for real work. Was overkill to use here.
 - I honestly didn't really reject or change output, maybe a few small UI quirks but that's about it. Not a lot of back and forth because the prompts I wrote were clear enough. Obviously in a more complex app there would be more planning and back and forth going on to reach the desired output.
 
 ## What I'd build next
+
 - A "watching" list
 - A mobile version
 - Actual persistence
