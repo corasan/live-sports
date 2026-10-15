@@ -54,6 +54,8 @@ export function applyEvent(game: Game, event: GameEvent): Game {
         score: event.score,
         status: 'final',
       }
+    case 'game_scheduled':
+      return event.game
     case 'lead_change':
     case 'injury':
       return game

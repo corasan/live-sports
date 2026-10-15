@@ -139,13 +139,12 @@ export function selectVisibleGames(feed: Feed, query: FeedQuery): readonly Game[
 
 function eventMatcher(
   games: ReadonlyMap<GameId, Game>,
-  gameIds: readonly GameId[],
   league: LeagueFilter,
   severity: Severity,
   q: string,
 ): (event: GameEvent) => boolean {
   const matches = gameMatcher(league, q)
-  const visible = new Set(gameIds.filter((id) => matches(lookup(games, id))))
+  const visible = new Set([...games.values()].filter(matches).map((game) => game.id))
   return (event) =>
     SEVERITY_RANK[event.severity] >= SEVERITY_RANK[severity] && visible.has(event.gameId)
 }
@@ -153,7 +152,6 @@ function eventMatcher(
 const feedRows = memoizeLast(
   (
     games: ReadonlyMap<GameId, Game>,
-    gameIds: readonly GameId[],
     events: ReadonlyMap<EventId, GameEvent>,
     order: Ring<EventId>,
     league: LeagueFilter,
@@ -161,7 +159,7 @@ const feedRows = memoizeLast(
     q: string,
     group: EventGrouping,
   ): readonly FeedRow[] => {
-    const passes = eventMatcher(games, gameIds, league, severity, q)
+    const passes = eventMatcher(games, league, severity, q)
     const groupOf = GROUPINGS[group]
     const groups = new Map<string, FeedRow[]>()
     for (let age = 0; age < size(order); age++) {
@@ -183,7 +181,6 @@ const feedRows = memoizeLast(
 export function selectFeedRows(feed: Feed, query: FeedQuery): readonly FeedRow[] {
   return feedRows(
     feed.games,
-    feed.gameIds,
     feed.events,
     feed.order,
     query.league,
@@ -248,7 +245,7 @@ const newEventCount = memoizeLast(
     severity: Severity,
     q: string,
   ): number => {
-    const passes = eventMatcher(feed.games, feed.gameIds, league, severity, q)
+    const passes = eventMatcher(feed.games, league, severity, q)
     const fresh = Math.min(feed.order.written - snapshotWritten, size(feed.order))
     let count = 0
     for (let age = 0; age < fresh; age++) {
