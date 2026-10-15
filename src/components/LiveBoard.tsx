@@ -2,8 +2,8 @@ import type { FeedQuery } from '#/feed/query'
 import { selectionSearch, type Selection } from '#/feed/selection'
 import { useSimulation } from '#/sim/useSimulation'
 import { FilteredBoard } from './FilteredBoard'
+import { GameDetailPanel } from './GameDetailPanel'
 import { OutageControls } from './OutageControls'
-import { SelectionPanel } from './SelectionPanel'
 import { StatusBanner } from './StatusBanner'
 import { StressControls } from './StressControls'
 import { BUTTON } from './styles'
@@ -38,7 +38,7 @@ export function LiveBoard({
         query={query}
         selected={selectionSearch(selection)}
         panel={
-          selection === undefined ? null : <SelectionPanel store={store} selection={selection} />
+          selection === undefined ? null : <GameDetailPanel store={store} selection={selection} />
         }
       />
     </main>

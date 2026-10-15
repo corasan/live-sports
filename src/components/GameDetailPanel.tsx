@@ -1,14 +1,20 @@
 import { useStore } from 'zustand'
 import { matchupLabel } from '#/domain/game'
-import type { EventId, GameId } from '#/domain/ids'
+import type { EventId } from '#/domain/ids'
+import type { Selection } from '#/feed/selection'
 import type { FeedStore } from '#/feed/store'
-import { selectGameDetail } from '#/feed/selectors'
-import { DetailPanel, MiniTimeline, RelatedList } from './DetailPanel'
+import { selectDetail } from '#/feed/selectors'
+import { DetailPanel, EventList, MiniTimeline } from './DetailPanel'
 import { GameStatus, oddsCells } from './gameLabels'
 import { useSelect } from './useSearchPatch'
 
-export function GameDetailPanel({ store, selected }: { store: FeedStore; selected: GameId }) {
-  const detail = useStore(store, (feed) => selectGameDetail(feed, selected))
+const MISSING: Readonly<Record<Selection['kind'], string>> = {
+  event: 'This event is no longer in the feed',
+  game: 'This game is no longer on the board',
+}
+
+export function GameDetailPanel({ store, selection }: { store: FeedStore; selection: Selection }) {
+  const detail = useStore(store, (feed) => selectDetail(feed, selection))
   const choose = useSelect()
   const select = (id: EventId) => choose({ kind: 'event', id })
 
@@ -16,11 +22,11 @@ export function GameDetailPanel({ store, selected }: { store: FeedStore; selecte
     return (
       <DetailPanel
         label="Game details"
-        heading={<p className="text-sm text-slate-500">This game is no longer on the board</p>}
+        heading={<p className="text-sm text-slate-500">{MISSING[selection.kind]}</p>}
       />
     )
 
-  const { game, timeline } = detail
+  const { game, timeline, recent, focus } = detail
   return (
     <DetailPanel
       label="Game details"
@@ -47,13 +53,8 @@ export function GameDetailPanel({ store, selected }: { store: FeedStore; selecte
           </div>
         ))}
       </dl>
-      <MiniTimeline timeline={timeline} focus={null} game={game} onSelect={select} />
-      <RelatedList
-        related={detail.recent}
-        empty="No events in this game yet"
-        game={game}
-        onSelect={select}
-      />
+      <MiniTimeline timeline={timeline} focus={focus} game={game} onSelect={select} />
+      <EventList events={recent} focus={focus} game={game} onSelect={select} />
     </DetailPanel>
   )
 }

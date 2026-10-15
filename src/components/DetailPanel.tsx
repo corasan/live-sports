@@ -4,6 +4,7 @@ import type { Game } from '#/domain/game'
 import type { EventId } from '#/domain/ids'
 import { describeEvent, eventTime, SEVERITY_DOT, SEVERITY_STYLE } from './describeEvent'
 import { isPlainKeypress } from './keys'
+import { SELECTED_STYLE } from './styles'
 import { useSelect } from './useSearchPatch'
 
 export function MiniTimeline({
@@ -46,32 +47,42 @@ export function MiniTimeline({
   )
 }
 
-export function RelatedList({
-  related,
-  empty,
+function reveal(row: HTMLElement | null) {
+  row?.scrollIntoView({ block: 'nearest' })
+}
+
+export function EventList({
+  events,
+  focus,
   game,
   onSelect,
 }: {
-  related: readonly GameEvent[]
-  empty: string
+  events: readonly GameEvent[]
+  focus: EventId | null
   game: Game
   onSelect: (id: EventId) => void
 }) {
-  if (related.length === 0) return <p className="text-sm text-slate-500">{empty}</p>
+  if (events.length === 0)
+    return <p className="text-sm text-slate-500">No events in this game yet</p>
   return (
-    <ul className="flex max-h-[40vh] flex-col gap-1 overflow-y-auto">
-      {related.map((event) => (
-        <li key={event.id}>
-          <button
-            type="button"
-            onClick={() => onSelect(event.id)}
-            className={`flex w-full cursor-pointer items-center gap-3 rounded border-l-4 px-3 py-2 text-left text-sm hover:brightness-95 ${SEVERITY_STYLE[event.severity]}`}
-          >
-            <time className="text-xs text-slate-400 tabular-nums">{eventTime(event)}</time>
-            <span className="min-w-0 truncate">{describeEvent(event, game)}</span>
-          </button>
-        </li>
-      ))}
+    <ul className="flex max-h-[40vh] flex-col gap-1 overflow-y-auto p-0.5">
+      {events.map((event) => {
+        const current = event.id === focus
+        return (
+          <li key={event.id}>
+            <button
+              ref={current ? reveal : undefined}
+              type="button"
+              aria-current={current || undefined}
+              onClick={() => onSelect(event.id)}
+              className={`flex w-full cursor-pointer items-center gap-3 rounded border-l-4 px-3 py-2 text-left text-sm ${SEVERITY_STYLE[event.severity]} ${current ? SELECTED_STYLE : 'hover:brightness-95'}`}
+            >
+              <time className="text-xs text-slate-400 tabular-nums">{eventTime(event)}</time>
+              <span className="min-w-0 truncate">{describeEvent(event, game)}</span>
+            </button>
+          </li>
+        )
+      })}
     </ul>
   )
 }
