@@ -4,5 +4,3 @@ export const BUTTON =
 export const SELECTED_STYLE = 'ring-2 ring-sky-500 ring-inset'
 
 export const SELECTED_CARD = 'border-sky-500 bg-sky-50 ring-2 ring-sky-500/30'
-
-export const SELECTED_ACCENT = 'border-t-4 border-t-sky-500'

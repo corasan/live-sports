@@ -5,9 +5,9 @@ import type { TeamId } from '#/domain/ids'
 export type Matchup = Pick<Game, 'league' | 'home' | 'away'>
 
 export const SEVERITY_STYLE: Readonly<Record<Severity, string>> = {
-  info: 'border-slate-200 text-slate-600',
-  notable: 'border-amber-400 bg-amber-50 text-slate-900',
-  critical: 'border-red-500 bg-red-50 font-semibold text-red-900',
+  info: 'bg-slate-50 text-slate-600',
+  notable: 'bg-amber-50 text-slate-900',
+  critical: 'bg-red-50 font-semibold text-red-900',
 }
 
 export const SEVERITY_DOT: Readonly<Record<Severity, string>> = {

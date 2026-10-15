@@ -4,7 +4,7 @@ import type { Game } from '#/domain/game'
 import type { EventId } from '#/domain/ids'
 import { describeEvent, eventTime, SEVERITY_DOT, SEVERITY_STYLE } from './describeEvent'
 import { isPlainKeypress } from './keys'
-import { SELECTED_ACCENT, SELECTED_STYLE } from './styles'
+import { SELECTED_STYLE } from './styles'
 import { useSelect } from './useSearchPatch'
 
 export function MiniTimeline({
@@ -75,7 +75,7 @@ export function EventList({
               type="button"
               aria-current={current || undefined}
               onClick={() => onSelect(event.id)}
-              className={`flex w-full cursor-pointer items-center gap-3 rounded border-l-4 px-3 py-2 text-left text-sm ${SEVERITY_STYLE[event.severity]} ${current ? SELECTED_STYLE : 'hover:brightness-95'}`}
+              className={`flex w-full cursor-pointer items-center gap-3 rounded px-3 py-2 text-left text-sm ${SEVERITY_STYLE[event.severity]} ${current ? SELECTED_STYLE : 'hover:brightness-95'}`}
             >
               <time className="text-xs text-slate-400 tabular-nums">{eventTime(event)}</time>
               <span className="min-w-0 truncate">{describeEvent(event, game)}</span>
@@ -111,7 +111,7 @@ export function DetailPanel({
   return (
     <aside
       aria-label={label}
-      className={`flex flex-col gap-4 rounded-lg border border-slate-200 bg-white p-4 shadow-sm lg:sticky lg:top-6 ${SELECTED_ACCENT}`}
+      className="flex flex-col gap-4 rounded-lg border border-slate-200 bg-white p-4 shadow-sm lg:sticky lg:top-6"
     >
       <div className="flex items-start justify-between gap-3">
         {heading}
