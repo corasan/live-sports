@@ -7,7 +7,8 @@ import type { EventId } from '#/domain/ids'
 import type { FeedStore } from '#/feed/store'
 import { selectFeedRows, stepSelection, type FeedQuery, type FeedRow } from '#/feed/view'
 import { describeEvent, eventTime, SEVERITY_STYLE, type Matchup } from './describeEvent'
-import { useSelection } from './useSelection'
+import { isPlainKeypress } from './keys'
+import { useSearchPatch } from './useSearchPatch'
 
 const ROW_HEIGHT = 44
 
@@ -19,18 +20,6 @@ const KEY_STEP: ReadonlyMap<string, 1 | -1> = new Map([
   ['ArrowDown', 1],
   ['ArrowUp', -1],
 ])
-
-const EDITABLE_TAGS: ReadonlySet<string> = new Set(['INPUT', 'SELECT', 'TEXTAREA'])
-
-function isTyping(target: EventTarget | null): boolean {
-  return (
-    target instanceof HTMLElement && (target.isContentEditable || EDITABLE_TAGS.has(target.tagName))
-  )
-}
-
-function hasModifier(event: KeyboardEvent): boolean {
-  return event.altKey || event.ctrlKey || event.metaKey || event.shiftKey
-}
 
 const EventRow = memo(function EventRow({
   event,
@@ -60,7 +49,7 @@ function FeedRowView({
   onSelect,
 }: {
   row: FeedRow
-  selected: EventId | null
+  selected: EventId | undefined
   onSelect: (id: EventId) => void
 }) {
   if (row.kind === 'event') {
@@ -88,10 +77,11 @@ export function EventFeed({
 }: {
   store: FeedStore
   query: FeedQuery
-  selected: EventId | null
+  selected: EventId | undefined
 }) {
   const rows = useStore(store, (feed) => selectFeedRows(feed, query))
-  const { select, close } = useSelection()
+  const patch = useSearchPatch()
+  const select = useCallback((event: EventId) => patch({ event }), [patch])
   const scrollRef = useRef<HTMLDivElement>(null)
   const getItemKey = useCallback((index: number) => rows[index].key, [rows])
   const virtualizer = useVirtualizer({
@@ -118,21 +108,13 @@ export function EventFeed({
   }, [rows, virtualizer])
 
   const onKeyDown = useEffectEvent((event: KeyboardEvent) => {
-    if (hasModifier(event) || isTyping(event.target)) return
     const delta = KEY_STEP.get(event.key)
-    if (delta !== undefined) {
-      const next = stepSelection(rows, selected, delta)
-      if (next === null) return
-      event.preventDefault()
-      select(next)
-      virtualizer.scrollToIndex(
-        rows.findIndex((row) => row.key === next),
-        { align: 'auto' },
-      )
-    } else if (event.key === 'Escape' && selected !== null) {
-      event.preventDefault()
-      close()
-    }
+    if (delta === undefined || !isPlainKeypress(event)) return
+    const next = stepSelection(rows, selected, delta)
+    if (next === null) return
+    event.preventDefault()
+    select(next.id)
+    virtualizer.scrollToIndex(next.index, { align: 'auto' })
   })
 
   useEffect(() => {

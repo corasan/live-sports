@@ -12,7 +12,7 @@ import {
 } from '#/feed/view'
 import { parseSeed } from '#/sim/seed'
 
-type HomeSearch = FeedQuery & {
+export type HomeSearch = FeedQuery & {
   readonly seed: number
   readonly event?: EventId
   readonly related: RelatedScope
@@ -24,7 +24,7 @@ export const Route = createFileRoute('/')({
     ...parseFeedQuery(
       Object.fromEntries(Object.entries(search).map(([key, value]) => [key, String(value)])),
     ),
-    event: parseEventId(String(search.event)) ?? undefined,
+    event: parseEventId(String(search.event)),
     related: parseOption(RELATED_SCOPES, String(search.related), DEFAULT_RELATED),
   }),
   search: { middlewares: [stripSearchParams({ ...DEFAULT_QUERY, related: DEFAULT_RELATED })] },
@@ -33,7 +33,5 @@ export const Route = createFileRoute('/')({
 
 function Home() {
   const { seed, event, related, ...query } = Route.useSearch()
-  return (
-    <LiveBoard key={seed} seed={seed} query={query} selected={event ?? null} related={related} />
-  )
+  return <LiveBoard key={seed} seed={seed} query={query} selected={event} related={related} />
 }

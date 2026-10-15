@@ -164,6 +164,13 @@ describe('selectEventDetail', () => {
     )
   })
 
+  it('spans the selected drive from its first to its last event', () => {
+    const stamps = emitted
+      .filter((event) => event.gameId === selected.gameId && event.drive === selected.drive)
+      .map((event) => event.ts)
+    expect(found('game').driveSpan).toEqual({ start: stamps[0], end: stamps.at(-1) })
+  })
+
   it('narrows the drive scope to a strict subset sharing the game and drive', () => {
     const drive = found('drive').related
     const game = found('game').related
@@ -197,26 +204,29 @@ describe('stepSelection', () => {
 
   it('starts at the first event row in either direction when nothing is selected', () => {
     expect(rows[0].kind).toBe('group')
-    expect(stepSelection(rows, null, 1)).toBe(ids[0])
-    expect(stepSelection(rows, null, -1)).toBe(ids[0])
-    expect(stepSelection(rows, eventId(999_999), -1)).toBe(ids[0])
+    expect(stepSelection(rows, undefined, 1)).toEqual({ id: ids[0], index: 1 })
+    expect(stepSelection(rows, undefined, -1)?.id).toBe(ids[0])
+    expect(stepSelection(rows, eventId(999_999), -1)?.id).toBe(ids[0])
   })
 
   it('walks every event row in order, skipping group headers', () => {
     const visited = [ids[0]]
-    for (let i = 1; i < ids.length; i++)
-      visited.push(stepSelection(rows, visited[i - 1], 1) ?? ids[0])
+    for (let i = 1; i < ids.length; i++) {
+      const step = stepSelection(rows, visited[i - 1], 1)
+      expect(step === null ? null : rows[step.index].key).toBe(step?.id)
+      visited.push(step?.id ?? ids[0])
+    }
     expect(visited).toEqual(ids)
     expect(headers.length).toBeGreaterThan(1)
   })
 
   it('clamps at both ends instead of wrapping', () => {
-    expect(stepSelection(rows, ids[0], -1)).toBe(ids[0])
-    expect(stepSelection(rows, ids.at(-1) ?? null, 1)).toBe(ids.at(-1))
+    expect(stepSelection(rows, ids[0], -1)?.id).toBe(ids[0])
+    expect(stepSelection(rows, ids.at(-1), 1)?.id).toBe(ids.at(-1))
   })
 
   it('selects nothing when there are no event rows', () => {
-    expect(stepSelection([], null, 1)).toBeNull()
+    expect(stepSelection([], undefined, 1)).toBeNull()
     expect(stepSelection([{ kind: 'group', key: 'group:x', label: 'X' }], ids[0], -1)).toBeNull()
   })
 })

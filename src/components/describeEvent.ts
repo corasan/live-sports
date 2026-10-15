@@ -1,7 +1,6 @@
 import type { GameEvent, Market, Severity } from '#/domain/event'
-import type { Game } from '#/domain/game'
+import { PERIOD_PREFIX, type Game } from '#/domain/game'
 import type { TeamId } from '#/domain/ids'
-import { PERIOD_PREFIX } from './Scoreboard'
 
 export type Matchup = Pick<Game, 'league' | 'home' | 'away'>
 

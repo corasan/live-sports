@@ -34,6 +34,8 @@ export const DEFAULT_QUERY: FeedQuery = {
 
 export const DEFAULT_RELATED: RelatedScope = 'game'
 
+export type DriveSpan = { readonly start: number; readonly end: number }
+
 export type EventDetail =
   | { readonly kind: 'missing' }
   | {
@@ -41,8 +43,11 @@ export type EventDetail =
       readonly event: GameEvent
       readonly game: Game
       readonly timeline: readonly GameEvent[]
+      readonly driveSpan: DriveSpan
       readonly related: readonly GameEvent[]
     }
+
+export type Step = { readonly id: EventId; readonly index: number }
 
 export type FeedRow =
   | { readonly kind: 'group'; readonly key: string; readonly label: string }
@@ -194,11 +199,13 @@ const eventDetail = memoizeLast(
       if (other.gameId === event.gameId) newestFirst.push(other)
     }
     const inScope = IN_SCOPE[scope]
+    const drive = newestFirst.filter((other) => IN_SCOPE.drive(event, other))
     return {
       kind: 'found',
       event,
       game: lookup(games, event.gameId),
       timeline: newestFirst.toReversed(),
+      driveSpan: { start: (drive.at(-1) ?? event).ts, end: (drive.at(0) ?? event).ts },
       related: newestFirst.filter((other) => other.id !== event.id && inScope(event, other)),
     }
   },
@@ -210,11 +217,15 @@ export function selectEventDetail(feed: Feed, id: EventId, scope: RelatedScope):
 
 export function stepSelection(
   rows: readonly FeedRow[],
-  selected: EventId | null,
+  selected: EventId | undefined,
   delta: 1 | -1,
-): EventId | null {
-  const ids = rows.flatMap((row) => (row.kind === 'event' ? [row.key] : []))
-  const index = selected === null ? -1 : ids.indexOf(selected)
-  if (index === -1) return ids.at(0) ?? null
-  return ids[Math.min(ids.length - 1, Math.max(0, index + delta))]
+): Step | null {
+  const current = selected === undefined ? -1 : rows.findIndex((row) => row.key === selected)
+  const direction = current === -1 ? 1 : delta
+  for (let index = current + direction; index >= 0 && index < rows.length; index += direction) {
+    const row = rows[index]
+    if (row.kind === 'event') return { id: row.key, index }
+  }
+  const stay = rows.at(current)
+  return current !== -1 && stay?.kind === 'event' ? { id: stay.key, index: current } : null
 }

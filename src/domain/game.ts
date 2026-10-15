@@ -5,6 +5,8 @@ export const LEAGUES = ['NBA', 'NFL', 'NHL'] as const
 
 export type League = (typeof LEAGUES)[number]
 
+export const PERIOD_PREFIX: Readonly<Record<League, string>> = { NBA: 'Q', NFL: 'Q', NHL: 'P' }
+
 export type Team = { readonly id: TeamId; readonly name: string }
 
 export type Odds = Readonly<Record<Market, number>>

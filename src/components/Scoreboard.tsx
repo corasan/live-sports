@@ -1,9 +1,7 @@
 import { useStore } from 'zustand'
-import type { Game, League } from '#/domain/game'
+import { PERIOD_PREFIX, type Game } from '#/domain/game'
 import type { FeedStore } from '#/feed/store'
 import { selectVisibleGames, type FeedQuery } from '#/feed/view'
-
-export const PERIOD_PREFIX: Readonly<Record<League, string>> = { NBA: 'Q', NFL: 'Q', NHL: 'P' }
 
 function statusLabel(game: Game): string {
   switch (game.status) {

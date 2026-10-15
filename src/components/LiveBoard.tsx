@@ -16,7 +16,7 @@ export function LiveBoard({
 }: {
   seed: number
   query: FeedQuery
-  selected: EventId | null
+  selected: EventId | undefined
   related: RelatedScope
 }) {
   const { store, paused, togglePaused } = useSimulation(seed)
@@ -40,7 +40,7 @@ export function LiveBoard({
       <Scoreboard store={store} query={query} />
       <div
         className={
-          selected === null
+          selected === undefined
             ? undefined
             : 'grid gap-6 lg:grid-cols-[minmax(0,1fr)_24rem] lg:items-start'
         }
@@ -53,7 +53,7 @@ export function LiveBoard({
             <EventFeed store={store} query={query} selected={selected} />
           )}
         </section>
-        {selected === null ? null : (
+        {selected === undefined ? null : (
           <EventDetailPanel store={store} selected={selected} related={related} />
         )}
       </div>

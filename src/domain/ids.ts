@@ -37,6 +37,6 @@ export function eventId(sequence: number): EventId {
   return value
 }
 
-export function parseEventId(raw: string): EventId | null {
-  return isEventId(raw) ? raw : null
+export function parseEventId(raw: string): EventId | undefined {
+  return isEventId(raw) ? raw : undefined
 }

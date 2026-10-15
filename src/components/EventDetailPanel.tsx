@@ -1,20 +1,17 @@
+import { useEffect } from 'react'
 import { useStore } from 'zustand'
 import type { GameEvent } from '#/domain/event'
 import { matchupLabel, type Game } from '#/domain/game'
 import type { EventId } from '#/domain/ids'
 import type { FeedStore } from '#/feed/store'
-import { RELATED_SCOPES, selectEventDetail, type RelatedScope } from '#/feed/view'
+import { RELATED_SCOPES, selectEventDetail, type DriveSpan, type RelatedScope } from '#/feed/view'
 import { describeEvent, eventTime, SEVERITY_DOT, SEVERITY_STYLE } from './describeEvent'
-import { useSelection, type Selection } from './useSelection'
+import { isPlainKeypress } from './keys'
+import { useSearchPatch } from './useSearchPatch'
 
-const SCOPE_LABEL: Readonly<Record<RelatedScope, string>> = {
-  game: 'Same game',
-  drive: 'Same drive',
-}
-
-const EMPTY_RELATED: Readonly<Record<RelatedScope, string>> = {
-  game: 'No other events in this game yet',
-  drive: 'No other events in this drive yet',
+const SCOPE: Readonly<Record<RelatedScope, { readonly label: string; readonly empty: string }>> = {
+  game: { label: 'Same game', empty: 'No other events in this game yet' },
+  drive: { label: 'Same drive', empty: 'No other events in this drive yet' },
 }
 
 const SEVERITY_LABEL: Readonly<Record<GameEvent['severity'], string>> = {
@@ -23,26 +20,15 @@ const SEVERITY_LABEL: Readonly<Record<GameEvent['severity'], string>> = {
   critical: 'Critical',
 }
 
-function CloseButton({ onClose }: { onClose: () => void }) {
-  return (
-    <button
-      type="button"
-      aria-label="Close details"
-      onClick={onClose}
-      className="rounded px-2 text-lg leading-none text-slate-500 hover:bg-slate-100 hover:text-slate-900"
-    >
-      ×
-    </button>
-  )
-}
-
 function MiniTimeline({
   timeline,
+  driveSpan,
   event,
   game,
   onSelect,
 }: {
   timeline: readonly GameEvent[]
+  driveSpan: DriveSpan
   event: GameEvent
   game: Game
   onSelect: (id: EventId) => void
@@ -50,14 +36,13 @@ function MiniTimeline({
   const first = timeline[0].ts
   const span = (timeline.at(-1)?.ts ?? first) - first
   const offset = (ts: number) => (span === 0 ? 50 : ((ts - first) / span) * 100)
-  const drive = timeline.filter((other) => other.drive === event.drive).map((other) => other.ts)
-  const driveStart = offset(Math.min(...drive))
+  const driveStart = offset(driveSpan.start)
   return (
     <div className="relative h-8" role="group" aria-label="Game timeline">
       <div className="absolute inset-x-0 top-1/2 h-px bg-slate-200" />
       <div
         className="absolute inset-y-1 min-w-1 -translate-x-0.5 rounded bg-sky-100"
-        style={{ left: `${driveStart}%`, width: `${offset(Math.max(...drive)) - driveStart}%` }}
+        style={{ left: `${driveStart}%`, width: `${offset(driveSpan.end) - driveStart}%` }}
       />
       {timeline.map((other) => {
         const current = other.id === event.id
@@ -83,16 +68,16 @@ function MiniTimeline({
 
 function RelatedList({
   related,
-  scope,
+  empty,
   game,
   onSelect,
 }: {
   related: readonly GameEvent[]
-  scope: RelatedScope
+  empty: string
   game: Game
   onSelect: (id: EventId) => void
 }) {
-  if (related.length === 0) return <p className="text-sm text-slate-500">{EMPTY_RELATED[scope]}</p>
+  if (related.length === 0) return <p className="text-sm text-slate-500">{empty}</p>
   return (
     <ul className="flex max-h-[40vh] flex-col gap-1 overflow-y-auto">
       {related.map((event) => (
@@ -111,7 +96,13 @@ function RelatedList({
   )
 }
 
-function ScopeToggle({ scope, onChange }: { scope: RelatedScope; onChange: Selection['scope'] }) {
+function ScopeToggle({
+  scope,
+  onChange,
+}: {
+  scope: RelatedScope
+  onChange: (scope: RelatedScope) => void
+}) {
   return (
     <div
       role="group"
@@ -126,7 +117,7 @@ function ScopeToggle({ scope, onChange }: { scope: RelatedScope; onChange: Selec
           onClick={() => onChange(option)}
           className={`flex-1 rounded px-3 py-1 text-sm font-medium ${option === scope ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'}`}
         >
-          {SCOPE_LABEL[option]}
+          {SCOPE[option].label}
         </button>
       ))}
     </div>
@@ -143,27 +134,46 @@ export function EventDetailPanel({
   related: RelatedScope
 }) {
   const detail = useStore(store, (feed) => selectEventDetail(feed, selected, related))
-  const selection = useSelection()
+  const patch = useSearchPatch()
+  const select = (event: EventId) => patch({ event })
+  const close = () => patch({ event: undefined })
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' || !isPlainKeypress(event)) return
+      event.preventDefault()
+      patch({ event: undefined })
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [patch])
+
   return (
     <aside
       aria-label="Event details"
       className="flex flex-col gap-4 rounded-lg border border-slate-200 bg-white p-4 shadow-sm lg:sticky lg:top-6"
     >
-      {detail.kind === 'missing' ? (
-        <div className="flex items-start justify-between gap-3">
+      <div className="flex items-start justify-between gap-3">
+        {detail.kind === 'missing' ? (
           <p className="text-sm text-slate-500">This event is no longer in the feed</p>
-          <CloseButton onClose={selection.close} />
-        </div>
-      ) : (
+        ) : (
+          <div>
+            <p className="text-xs font-medium text-slate-500">{detail.game.league}</p>
+            <h2 className="text-lg font-semibold">{matchupLabel(detail.game)}</h2>
+          </div>
+        )}
+        <button
+          type="button"
+          aria-label="Close details"
+          onClick={close}
+          className="rounded px-2 text-lg leading-none text-slate-500 hover:bg-slate-100 hover:text-slate-900"
+        >
+          ×
+        </button>
+      </div>
+      {detail.kind === 'found' ? (
         <>
-          <header className="flex flex-col gap-2">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="text-xs font-medium text-slate-500">{detail.game.league}</p>
-                <h2 className="text-lg font-semibold">{matchupLabel(detail.game)}</h2>
-              </div>
-              <CloseButton onClose={selection.close} />
-            </div>
+          <div className="flex flex-col gap-2">
             <p
               className={`rounded border-l-4 px-3 py-2 text-sm ${SEVERITY_STYLE[detail.event.severity]}`}
             >
@@ -174,22 +184,23 @@ export function EventDetailPanel({
               <span>{SEVERITY_LABEL[detail.event.severity]}</span>
               <span>Drive {detail.event.drive + 1}</span>
             </p>
-          </header>
+          </div>
           <MiniTimeline
             timeline={detail.timeline}
+            driveSpan={detail.driveSpan}
             event={detail.event}
             game={detail.game}
-            onSelect={selection.select}
+            onSelect={select}
           />
-          <ScopeToggle scope={related} onChange={selection.scope} />
+          <ScopeToggle scope={related} onChange={(scope) => patch({ related: scope })} />
           <RelatedList
             related={detail.related}
-            scope={related}
+            empty={SCOPE[related].empty}
             game={detail.game}
-            onSelect={selection.select}
+            onSelect={select}
           />
         </>
-      )}
+      ) : null}
     </aside>
   )
 }
