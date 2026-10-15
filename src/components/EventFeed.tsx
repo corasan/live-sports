@@ -26,7 +26,7 @@ import {
 import { describeEvent, eventTime, SEVERITY_STYLE, type Matchup } from './describeEvent'
 import { BUTTON } from './FeedControls'
 import { isPlainKeypress } from './keys'
-import { useSearchPatch } from './useSearchPatch'
+import { useSearchPatch, useSelect } from './useSearchPatch'
 
 const ROW_HEIGHT = 44
 
@@ -38,7 +38,7 @@ const SKELETON_ROWS = 8
 
 const NO_ROWS: readonly FeedRow[] = []
 
-const SELECTED_STYLE = 'ring-2 ring-sky-500 ring-inset'
+export const SELECTED_STYLE = 'ring-2 ring-sky-500 ring-inset'
 
 const KEY_STEP: ReadonlyMap<string, 1 | -1> = new Map([
   ['ArrowDown', 1],
@@ -177,8 +177,8 @@ export function EventFeed({
     snapshot === null ? selectFeedView(feed, query) : selectHeldView(snapshot, query),
   )
   const rows = view.kind === 'rows' ? view.rows : NO_ROWS
-  const patch = useSearchPatch()
-  const select = useCallback((event: EventId) => patch({ event }), [patch])
+  const choose = useSelect()
+  const select = useCallback((id: EventId) => choose({ kind: 'event', id }), [choose])
   const scrollRef = useRef<HTMLDivElement>(null)
   const getItemKey = useCallback((index: number) => rows[index].key, [rows])
   const virtualizer = useVirtualizer({

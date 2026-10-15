@@ -1,30 +1,10 @@
 import { useStore } from 'zustand'
-import { PERIOD_PREFIX, type Game } from '#/domain/game'
+import type { GameId } from '#/domain/ids'
 import type { FeedStore } from '#/feed/store'
 import { selectVisibleGames, type FeedQuery } from '#/feed/view'
-
-function statusLabel(game: Game): string {
-  switch (game.status) {
-    case 'scheduled':
-      return 'Scheduled'
-    case 'live':
-      return `${PERIOD_PREFIX[game.league]}${game.period}`
-    case 'final':
-      return 'Final'
-  }
-}
-
-function signed(value: number): string {
-  return value > 0 ? `+${value}` : `${value}`
-}
-
-function oddsCells(game: Game): readonly (readonly [label: string, value: string])[] {
-  return [
-    ['Home win', `${game.odds.moneyline}%`],
-    ['Spread', signed(game.odds.spread)],
-    ['O/U', `${game.odds.total}`],
-  ]
-}
+import { SELECTED_STYLE } from './EventFeed'
+import { oddsCells, statusLabel } from './gameLabels'
+import { useSelect } from './useSearchPatch'
 
 const GRID = 'grid gap-3 sm:grid-cols-2 lg:grid-cols-4'
 const CARD = 'rounded-lg border border-slate-200 bg-white p-3 shadow-sm'
@@ -63,38 +43,59 @@ function ScoreboardSkeleton({ store }: { store: FeedStore }) {
   )
 }
 
-export function Scoreboard({ store, query }: { store: FeedStore; query: FeedQuery }) {
+export function Scoreboard({
+  store,
+  query,
+  selected,
+}: {
+  store: FeedStore
+  query: FeedQuery
+  selected: GameId | undefined
+}) {
   const games = useStore(store, (feed) =>
     feed.syncedAt === null ? null : selectVisibleGames(feed, query),
   )
+  const select = useSelect()
   if (games === null) return <ScoreboardSkeleton store={store} />
   if (games.length === 0) return <p className="text-sm text-slate-500">No matching games</p>
   return (
     <ul className={GRID}>
-      {games.map((game) => (
-        <li key={game.id} className={CARD}>
-          <div className={`${HEADER} font-medium whitespace-nowrap text-slate-500`}>
-            <span>{game.league}</span>
-            <span className={game.status === 'live' ? 'text-red-600' : undefined}>
-              {statusLabel(game)}
-            </span>
-          </div>
-          <dl className={TEAMS}>
-            <dt className="truncate">{game.away.name}</dt>
-            <dd className="text-right font-semibold tabular-nums">{game.score.away}</dd>
-            <dt className="truncate">{game.home.name}</dt>
-            <dd className="text-right font-semibold tabular-nums">{game.score.home}</dd>
-          </dl>
-          <dl className={ODDS}>
-            {oddsCells(game).map(([label, value]) => (
-              <div key={label} className="min-w-0">
-                <dt className="truncate text-slate-500">{label}</dt>
-                <dd className="truncate font-medium text-slate-700 tabular-nums">{value}</dd>
-              </div>
-            ))}
-          </dl>
-        </li>
-      ))}
+      {games.map((game) => {
+        const current = game.id === selected
+        return (
+          <li key={game.id}>
+            <button
+              type="button"
+              aria-current={current || undefined}
+              onClick={() => select({ kind: 'game', id: game.id })}
+              className={`${CARD} block w-full cursor-pointer text-left ${current ? SELECTED_STYLE : 'hover:border-slate-300'}`}
+            >
+              <span className={`${HEADER} font-medium whitespace-nowrap text-slate-500`}>
+                <span>{game.league}</span>
+                <span className={game.status === 'live' ? 'text-red-600' : undefined}>
+                  {statusLabel(game)}
+                </span>
+              </span>
+              <span className={TEAMS}>
+                <span className="truncate">{game.away.name}</span>
+                <span className="text-right font-semibold tabular-nums">{game.score.away}</span>
+                <span className="truncate">{game.home.name}</span>
+                <span className="text-right font-semibold tabular-nums">{game.score.home}</span>
+              </span>
+              <span className={ODDS}>
+                {oddsCells(game).map(([label, value]) => (
+                  <span key={label} className="flex min-w-0 flex-col">
+                    <span className="truncate text-slate-500">{label}</span>
+                    <span className="truncate font-medium text-slate-700 tabular-nums">
+                      {value}
+                    </span>
+                  </span>
+                ))}
+              </span>
+            </button>
+          </li>
+        )
+      })}
     </ul>
   )
 }
