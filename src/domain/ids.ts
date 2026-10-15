@@ -36,3 +36,7 @@ export function eventId(sequence: number): EventId {
   if (!isEventId(value)) throw new Error(`Invalid event sequence: ${sequence}`)
   return value
 }
+
+export function parseEventId(raw: string): EventId | null {
+  return isEventId(raw) ? raw : null
+}
