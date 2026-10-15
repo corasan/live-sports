@@ -4,8 +4,11 @@ import { useStore } from 'zustand'
 import type { GameEvent, Market, Severity } from '#/domain/event'
 import { matchupLabel, type Game } from '#/domain/game'
 import type { TeamId } from '#/domain/ids'
+import type { Feed } from '#/feed/feed'
+import { size } from '#/feed/ring'
 import type { FeedStore } from '#/feed/store'
 import { countNewEvents, selectFeedRows, type FeedQuery, type FeedRow } from '#/feed/view'
+import { BUTTON } from './FeedControls'
 import { PERIOD_PREFIX } from './Scoreboard'
 
 const ROW_HEIGHT = 44
@@ -80,39 +83,43 @@ function FeedRowView({ row }: { row: FeedRow }) {
   )
 }
 
-function useHeld<T>(value: T, held: boolean): T | null {
-  const [snapshot, setSnapshot] = useState<T | null>(null)
-  if (held && snapshot === null) {
-    setSnapshot(value)
-    return value
-  }
-  if (!held && snapshot !== null) {
-    setSnapshot(null)
-    return null
-  }
-  return snapshot
-}
-
 function newEventsLabel(count: number): string {
   return count === 1 ? '1 new event' : `${count} new events`
 }
 
-export function EventFeed({
+function NewEventsPill({
   store,
+  snapshot,
   query,
-  paused,
-  onResume,
+  onClick,
 }: {
   store: FeedStore
+  snapshot: Feed
   query: FeedQuery
-  paused: boolean
-  onResume: () => void
+  onClick: () => void
 }) {
-  const live = useStore(store)
+  const count = useStore(store, (feed) => countNewEvents(feed, snapshot, query))
+  if (count === 0) return null
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="absolute top-2 left-1/2 -translate-x-1/2 rounded-full bg-slate-900 px-3 py-1 text-xs font-medium text-white shadow-md hover:bg-slate-700"
+    >
+      {newEventsLabel(count)}
+    </button>
+  )
+}
+
+export function EventFeed({ store, query }: { store: FeedStore; query: FeedQuery }) {
+  const [paused, setPaused] = useState(false)
   const [scrolledAway, setScrolledAway] = useState(false)
-  const snapshot = useHeld(live, paused || scrolledAway)
-  const rows = selectFeedRows(snapshot ?? live, query)
-  const newEvents = snapshot === null ? 0 : countNewEvents(live, snapshot, query)
+  const [snapshot, setSnapshot] = useState<Feed | null>(null)
+  const held = paused || scrolledAway
+  if (held && snapshot === null) setSnapshot(store.getState())
+  if (!held && snapshot !== null) setSnapshot(null)
+  const waiting = useStore(store, (feed) => size(feed.order) === 0)
+  const rows = useStore(store, (feed) => selectFeedRows(snapshot ?? feed, query))
   const scrollRef = useRef<HTMLDivElement>(null)
   const getItemKey = useCallback((index: number) => rows[index].key, [rows])
   const virtualizer = useVirtualizer({
@@ -125,42 +132,51 @@ export function EventFeed({
 
   function jumpToLatest() {
     scrollRef.current?.scrollTo({ top: 0, behavior: 'instant' })
-    setScrolledAway(false)
-    onResume()
+    setPaused(false)
   }
 
   return (
-    <div className="relative">
-      <div
-        ref={scrollRef}
-        onScroll={(event) => setScrolledAway(event.currentTarget.scrollTop > SCROLL_THRESHOLD)}
-        className="h-[60vh] overflow-y-auto"
-      >
-        {rows.length === 0 ? (
-          <p className="text-sm text-slate-500">No matching events</p>
-        ) : (
-          <ol className="relative" style={{ height: virtualizer.getTotalSize() }}>
-            {virtualizer.getVirtualItems().map((item) => (
-              <li
-                key={item.key}
-                className="absolute inset-x-0 top-0 pb-2"
-                style={{ height: ROW_HEIGHT, transform: `translateY(${item.start}px)` }}
-              >
-                <FeedRowView row={rows[item.index]} />
-              </li>
-            ))}
-          </ol>
-        )}
-      </div>
-      {newEvents > 0 && (
+    <section className="flex flex-col gap-2">
+      <div className="flex items-center justify-between">
+        <h2 className="text-lg font-semibold">Feed</h2>
         <button
           type="button"
-          onClick={jumpToLatest}
-          className="absolute top-2 left-1/2 -translate-x-1/2 rounded-full bg-slate-900 px-3 py-1 text-xs font-medium text-white shadow-md hover:bg-slate-700"
+          onClick={() => setPaused((value) => !value)}
+          className={`${BUTTON} text-sm`}
         >
-          {newEventsLabel(newEvents)}
+          {paused ? 'Resume feed' : 'Pause feed'}
         </button>
+      </div>
+      {waiting ? (
+        <p className="text-sm text-slate-500">Waiting for tip-off…</p>
+      ) : (
+        <div className="relative">
+          <div
+            ref={scrollRef}
+            onScroll={(event) => setScrolledAway(event.currentTarget.scrollTop > SCROLL_THRESHOLD)}
+            className="h-[60vh] overflow-y-auto"
+          >
+            {rows.length === 0 ? (
+              <p className="text-sm text-slate-500">No matching events</p>
+            ) : (
+              <ol className="relative" style={{ height: virtualizer.getTotalSize() }}>
+                {virtualizer.getVirtualItems().map((item) => (
+                  <li
+                    key={item.key}
+                    className="absolute inset-x-0 top-0 pb-2"
+                    style={{ height: ROW_HEIGHT, transform: `translateY(${item.start}px)` }}
+                  >
+                    <FeedRowView row={rows[item.index]} />
+                  </li>
+                ))}
+              </ol>
+            )}
+          </div>
+          {snapshot !== null && (
+            <NewEventsPill store={store} snapshot={snapshot} query={query} onClick={jumpToLatest} />
+          )}
+        </div>
       )}
-    </div>
+    </section>
   )
 }

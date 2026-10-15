@@ -168,34 +168,22 @@ export function selectFeedRows(feed: Feed, query: FeedQuery): readonly FeedRow[]
 
 const newEventCount = memoizeLast(
   (
-    games: ReadonlyMap<GameId, Game>,
-    gameIds: readonly GameId[],
-    events: ReadonlyMap<EventId, GameEvent>,
-    order: Ring<EventId>,
+    feed: Feed,
     snapshotWritten: number,
     league: LeagueFilter,
     severity: Severity,
     q: string,
   ): number => {
-    const passes = eventMatcher(games, gameIds, league, severity, q)
-    const fresh = Math.min(order.written - snapshotWritten, size(order))
+    const passes = eventMatcher(feed.games, feed.gameIds, league, severity, q)
+    const fresh = Math.min(feed.order.written - snapshotWritten, size(feed.order))
     let count = 0
     for (let age = 0; age < fresh; age++) {
-      if (passes(eventAt({ events, order }, age))) count++
+      if (passes(eventAt(feed, age))) count++
     }
     return count
   },
 )
 
 export function countNewEvents(live: Feed, snapshot: Feed, query: FeedQuery): number {
-  return newEventCount(
-    live.games,
-    live.gameIds,
-    live.events,
-    live.order,
-    snapshot.order.written,
-    query.league,
-    query.severity,
-    query.q,
-  )
+  return newEventCount(live, snapshot.order.written, query.league, query.severity, query.q)
 }
