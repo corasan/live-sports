@@ -5,11 +5,12 @@ import type { FeedStore } from '#/feed/store'
 import type { FeedQuery } from '#/feed/query'
 import { selectVisibleGames } from '#/feed/selectors'
 import { GameStatus, oddsCells } from './gameLabels'
-import { SELECTED_STYLE } from './styles'
+import { SELECTED_CARD } from './styles'
 import { useSelect } from './useSearchPatch'
 
 const GRID = 'grid gap-3 sm:grid-cols-2 lg:grid-cols-4'
-const CARD = 'rounded-lg border border-slate-200 bg-white p-3 shadow-sm'
+const CARD = 'rounded-lg border p-3 shadow-sm'
+const IDLE_CARD = 'border-slate-200 bg-white'
 const HEADER = 'flex h-4 items-center justify-between text-xs leading-4'
 const TEAMS = 'mt-2 grid grid-cols-[minmax(0,1fr)_auto] gap-x-2 gap-y-1 text-sm leading-5'
 const ODDS = 'mt-2 grid grid-cols-3 gap-x-2 text-xs leading-4'
@@ -20,7 +21,7 @@ function ScoreboardSkeleton({ store }: { store: FeedStore }) {
   return (
     <ul aria-busy="true" aria-label="Loading games" className={GRID}>
       {Array.from({ length: count }, (_, index) => (
-        <li key={index} className={`${CARD} animate-pulse`}>
+        <li key={index} className={`${CARD} ${IDLE_CARD} animate-pulse`}>
           <div className={HEADER}>
             <div className={`h-3 w-8 ${BONE}`} />
             <div className={`h-3 w-6 ${BONE}`} />
@@ -70,7 +71,7 @@ export const Scoreboard = memo(function Scoreboard({
               type="button"
               aria-current={current || undefined}
               onClick={() => select({ kind: 'game', id: game.id })}
-              className={`${CARD} block w-full cursor-pointer text-left ${current ? SELECTED_STYLE : 'hover:border-slate-300'}`}
+              className={`${CARD} block w-full cursor-pointer text-left ${current ? SELECTED_CARD : `${IDLE_CARD} hover:border-slate-300`}`}
             >
               <span className={`${HEADER} font-medium whitespace-nowrap text-slate-500`}>
                 <GameStatus game={game} />

@@ -1,5 +1,5 @@
 import type { FeedQuery } from '#/feed/query'
-import { selectionSearch, type Selection } from '#/feed/selection'
+import type { Selection } from '#/feed/selection'
 import { useSimulation } from '#/sim/useSimulation'
 import { FilteredBoard } from './FilteredBoard'
 import { GameDetailPanel } from './GameDetailPanel'
@@ -36,7 +36,7 @@ export function LiveBoard({
       <FilteredBoard
         store={store}
         query={query}
-        selected={selectionSearch(selection)}
+        selection={selection}
         panel={
           selection === undefined ? null : <GameDetailPanel store={store} selection={selection} />
         }

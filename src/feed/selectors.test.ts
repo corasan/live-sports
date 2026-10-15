@@ -11,6 +11,7 @@ import type { Selection } from './selection'
 import {
   countNewEvents,
   selectDetail,
+  selectedGame,
   selectFeedRows,
   selectFeedView,
   selectHeldView,
@@ -448,6 +449,17 @@ describe('selectDetail', () => {
     const later = ingestTicks(feed, simulate(7, 140).batches.slice(120))
     expect(size(later.order)).toBeGreaterThan(size(feed.order))
     expect(found(later, { kind: 'event', id: focused.id })).not.toBe(first)
+  })
+})
+
+describe('selectedGame', () => {
+  const event = emitted[emitted.length >> 1]
+
+  it('marks the selected game, or the game an in-feed selected event belongs to', () => {
+    expect(selectedGame(feed, undefined)).toBeUndefined()
+    expect(selectedGame(feed, { kind: 'game', id: event.gameId })).toBe(event.gameId)
+    expect(selectedGame(feed, { kind: 'event', id: event.id })).toBe(event.gameId)
+    expect(selectedGame(feed, { kind: 'event', id: eventId(999_999) })).toBeUndefined()
   })
 })
 

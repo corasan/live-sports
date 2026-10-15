@@ -4,7 +4,7 @@ import type { Game } from '#/domain/game'
 import type { EventId } from '#/domain/ids'
 import { describeEvent, eventTime, SEVERITY_DOT, SEVERITY_STYLE } from './describeEvent'
 import { isPlainKeypress } from './keys'
-import { SELECTED_STYLE } from './styles'
+import { SELECTED_ACCENT, SELECTED_STYLE } from './styles'
 import { useSelect } from './useSearchPatch'
 
 export function MiniTimeline({
@@ -111,7 +111,7 @@ export function DetailPanel({
   return (
     <aside
       aria-label={label}
-      className="flex flex-col gap-4 rounded-lg border border-slate-200 bg-white p-4 shadow-sm lg:sticky lg:top-6"
+      className={`flex flex-col gap-4 rounded-lg border border-slate-200 bg-white p-4 shadow-sm lg:sticky lg:top-6 ${SELECTED_ACCENT}`}
     >
       <div className="flex items-start justify-between gap-3">
         {heading}

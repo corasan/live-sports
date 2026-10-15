@@ -217,6 +217,17 @@ export function selectDetail(feed: Feed, selection: Selection): Detail {
   }
 }
 
+export function selectedGame(feed: Feed, selection: Selection | undefined): GameId | undefined {
+  switch (selection?.kind) {
+    case undefined:
+      return undefined
+    case 'game':
+      return selection.id
+    case 'event':
+      return feed.events.get(selection.id)?.gameId
+  }
+}
+
 export function stepSelection(
   rows: readonly FeedRow[],
   selected: EventId | undefined,
