@@ -1,12 +1,12 @@
-import type { Market } from '#/domain/event'
+import type { Market, Moment } from '#/domain/event'
 import { PERIOD_PREFIX, type Game, type League } from '#/domain/game'
 
-function statusLabel(game: Game): string {
-  switch (game.status) {
+export function statusLabel(league: League, moment: Moment): string {
+  switch (moment.status) {
     case 'scheduled':
       return 'Scheduled'
     case 'live':
-      return `${PERIOD_PREFIX[game.league]}${game.period}`
+      return `${PERIOD_PREFIX[league]}${moment.period}`
     case 'final':
       return 'Final'
   }
@@ -17,7 +17,7 @@ export function GameStatus({ game }: { game: Game }) {
     <>
       <span>{game.league}</span>
       <span className={game.status === 'live' ? 'text-red-600' : undefined}>
-        {statusLabel(game)}
+        {statusLabel(game.league, game)}
       </span>
     </>
   )
@@ -25,6 +25,11 @@ export function GameStatus({ game }: { game: Game }) {
 
 function signed(value: number): string {
   return value > 0 ? `+${value}` : `${value}`
+}
+
+export function marketDelta(market: Market, from: number, to: number): string {
+  const delta = signed(to - from)
+  return market === 'moneyline' ? `${delta}%` : delta
 }
 
 const SCORE_UNIT: Readonly<Record<League, { readonly one: string; readonly many: string }>> = {

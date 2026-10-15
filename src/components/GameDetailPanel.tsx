@@ -6,6 +6,7 @@ import type { Selection } from '#/feed/selection'
 import type { FeedStore } from '#/feed/store'
 import { selectDetail } from '#/feed/selectors'
 import { DetailPanel, EventList, MiniTimeline } from './DetailPanel'
+import { EventDetail } from './EventDetail'
 import { GameStatus, oddsCells } from './gameLabels'
 import { columnAlign, Term } from './Term'
 import { useSelect } from './useSearchPatch'
@@ -31,9 +32,10 @@ export function GameDetailPanel({ store, selection }: { store: FeedStore; select
 
   const { game, timeline, recent, focus } = detail
   const cells = oddsCells(game)
+  const focusId = focus?.id ?? null
   return (
     <DetailPanel
-      label="Game details"
+      label={focus === null ? 'Game details' : 'Event details'}
       heading={
         <div>
           <p className="flex gap-2 text-xs font-medium text-slate-500">
@@ -43,6 +45,7 @@ export function GameDetailPanel({ store, selection }: { store: FeedStore; select
         </div>
       }
     >
+      {focus !== null && <EventDetail event={focus} game={game} />}
       <dl className="grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-3 gap-y-1">
         <dt className="truncate text-sm text-slate-600">{game.away.name}</dt>
         <dd className="text-right text-3xl font-bold tabular-nums">{game.score.away}</dd>
@@ -65,8 +68,8 @@ export function GameDetailPanel({ store, selection }: { store: FeedStore; select
           </div>
         ))}
       </dl>
-      <MiniTimeline timeline={timeline} focus={focus} game={game} onSelect={select} />
-      <EventList events={recent} focus={focus} game={game} onSelect={select} />
+      <MiniTimeline timeline={timeline} focus={focusId} game={game} onSelect={select} />
+      <EventList events={recent} focus={focusId} game={game} onSelect={select} />
     </DetailPanel>
   )
 }

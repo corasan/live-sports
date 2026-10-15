@@ -9,7 +9,7 @@ import {
   type ReactNode,
 } from 'react'
 import { useStore } from 'zustand'
-import type { GameEvent } from '#/domain/event'
+import { severityOf, type GameEvent } from '#/domain/event'
 import { matchupLabel } from '#/domain/game'
 import type { EventId } from '#/domain/ids'
 import type { Feed, Gap } from '#/feed/feed'
@@ -73,7 +73,7 @@ const EventRow = memo(function EventRow({
       type="button"
       aria-current={selected || undefined}
       onClick={() => onSelect(event.id)}
-      className={`flex h-full w-full cursor-pointer items-center gap-3 rounded px-3 text-left text-sm whitespace-nowrap ${SEVERITY_STYLE[event.severity]} ${selected ? SELECTED_STYLE : 'hover:brightness-95'} ${arrived ? 'animate-arrive' : ''}`}
+      className={`flex h-full w-full cursor-pointer items-center gap-3 rounded px-3 text-left text-sm whitespace-nowrap ${SEVERITY_STYLE[severityOf(event)]} ${selected ? SELECTED_STYLE : 'hover:brightness-95'} ${arrived ? 'animate-arrive' : ''}`}
     >
       <time className="text-xs text-slate-400 tabular-nums">{eventTime(event)}</time>
       <span className="text-xs text-slate-500">{matchupLabel({ home, away })}</span>

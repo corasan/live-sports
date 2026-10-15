@@ -1,4 +1,4 @@
-import type { GameEvent, Severity } from '#/domain/event'
+import { severityOf, type GameEvent, type Severity } from '#/domain/event'
 import { matchupLabel, type Game, type GameStatus } from '#/domain/game'
 import type { EventId, GameId, TeamId } from '#/domain/ids'
 import { eventAt, lookup, type Feed, type Gap } from './feed'
@@ -16,7 +16,7 @@ export type Detail =
       readonly game: Game
       readonly timeline: readonly GameEvent[]
       readonly recent: readonly GameEvent[]
-      readonly focus: EventId | null
+      readonly focus: GameEvent | null
     }
 
 export type FeedRow =
@@ -105,8 +105,8 @@ function eventMatcher(
 ): (event: GameEvent) => boolean {
   const matches = gameMatcher(teams, q)
   const visible = new Set([...games.values()].filter(matches).map((game) => game.id))
-  return (event) =>
-    SEVERITY_RANK[event.severity] >= SEVERITY_RANK[severity] && visible.has(event.gameId)
+  const minimum = SEVERITY_RANK[severity]
+  return (event) => SEVERITY_RANK[severityOf(event)] >= minimum && visible.has(event.gameId)
 }
 
 const feedRows = memoizeLast(
@@ -196,7 +196,7 @@ const detail = memoizeLast(
     order: Ring<EventId>,
     games: ReadonlyMap<GameId, Game>,
     id: GameId,
-    focus: EventId | null,
+    focus: GameEvent | null,
   ): Detail => {
     const game = games.get(id)
     if (game === undefined) return MISSING
@@ -212,7 +212,7 @@ export function selectDetail(feed: Feed, selection: Selection): Detail {
     case 'event': {
       const event = feed.events.get(selection.id)
       if (event === undefined) return MISSING
-      return detail(feed.events, feed.order, feed.games, event.gameId, event.id)
+      return detail(feed.events, feed.order, feed.games, event.gameId, event)
     }
   }
 }

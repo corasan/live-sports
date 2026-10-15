@@ -1,4 +1,4 @@
-import type { GameEvent, Market, Severity } from '#/domain/event'
+import type { GameEvent, Market, Score, Severity } from '#/domain/event'
 import { matchupLabel, PERIOD_PREFIX, type Game } from '#/domain/game'
 import type { TeamId } from '#/domain/ids'
 
@@ -30,6 +30,10 @@ export function clockTime(ts: number): string {
   return new Date(ts).toLocaleTimeString()
 }
 
+export function scoreLabel(score: Score): string {
+  return `${score.away}-${score.home}`
+}
+
 export function eventTime(event: GameEvent): string {
   return clockTime(event.ts)
 }
@@ -39,7 +43,7 @@ export function describeEvent(event: GameEvent, matchup: Matchup): string {
     case 'game_started':
       return 'Game started'
     case 'score':
-      return `${teamName(matchup, event.teamId)} +${event.points} (${event.score.away}-${event.score.home})`
+      return `${teamName(matchup, event.teamId)} +${event.points} (${scoreLabel(event.score)})`
     case 'lead_change':
       return `${teamName(matchup, event.leader)} take the lead`
     case 'period_ended':
@@ -49,7 +53,7 @@ export function describeEvent(event: GameEvent, matchup: Matchup): string {
     case 'odds_shift':
       return `${MARKET_LABEL[event.market]} ${event.from} → ${event.to}`
     case 'game_ended':
-      return `Final ${event.score.away}-${event.score.home}`
+      return `Final ${scoreLabel(event.score)}`
     case 'game_scheduled':
       return `Scheduled: ${matchupLabel(event.game)}`
   }
