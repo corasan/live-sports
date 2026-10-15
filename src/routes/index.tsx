@@ -1,37 +1,52 @@
 import { createFileRoute, stripSearchParams } from '@tanstack/react-router'
 import { LiveBoard } from '#/components/LiveBoard'
-import { parseEventId, type EventId } from '#/domain/ids'
 import {
   DEFAULT_QUERY,
   DEFAULT_RELATED,
   parseFeedQuery,
   parseOption,
+  parseSelection,
   RELATED_SCOPES,
+  selectionSearch,
   type FeedQuery,
   type RelatedScope,
+  type SelectionSearch,
 } from '#/feed/view'
 import { parseSeed } from '#/sim/seed'
 
-export type HomeSearch = FeedQuery & {
-  readonly seed: number
-  readonly event?: EventId
-  readonly related: RelatedScope
-}
+export type HomeSearch = FeedQuery &
+  Partial<SelectionSearch> & {
+    readonly seed: number
+    readonly related: RelatedScope
+  }
 
 export const Route = createFileRoute('/')({
-  validateSearch: (search: Partial<HomeSearch>): HomeSearch => ({
-    seed: parseSeed(String(search.seed)),
-    ...parseFeedQuery(
-      Object.fromEntries(Object.entries(search).map(([key, value]) => [key, String(value)])),
-    ),
-    event: parseEventId(String(search.event)),
-    related: parseOption(RELATED_SCOPES, String(search.related), DEFAULT_RELATED),
-  }),
+  validateSearch: (search: Partial<HomeSearch>): HomeSearch => {
+    const raw = Object.fromEntries(
+      Object.entries(search)
+        .filter(([, value]) => value !== undefined)
+        .map(([key, value]) => [key, String(value)]),
+    )
+    return {
+      seed: parseSeed(raw.seed ?? ''),
+      ...parseFeedQuery({ ...raw, teams: search.teams }),
+      ...selectionSearch(parseSelection(raw)),
+      related: parseOption(RELATED_SCOPES, raw.related, DEFAULT_RELATED),
+    }
+  },
   search: { middlewares: [stripSearchParams({ ...DEFAULT_QUERY, related: DEFAULT_RELATED })] },
   component: Home,
 })
 
 function Home() {
-  const { seed, event, related, ...query } = Route.useSearch()
-  return <LiveBoard key={seed} seed={seed} query={query} selected={event} related={related} />
+  const { seed, event, game, related, ...query } = Route.useSearch()
+  return (
+    <LiveBoard
+      key={seed}
+      seed={seed}
+      query={query}
+      selection={parseSelection({ event, game })}
+      related={related}
+    />
+  )
 }

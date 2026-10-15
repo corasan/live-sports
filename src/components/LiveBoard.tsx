@@ -1,25 +1,28 @@
-import type { EventId } from '#/domain/ids'
-import type { FeedQuery, RelatedScope } from '#/feed/view'
+import type { FeedStore } from '#/feed/store'
+import { selectionSearch, type FeedQuery, type RelatedScope, type Selection } from '#/feed/view'
 import { useSimulation } from '#/sim/useSimulation'
 import { EventDetailPanel } from './EventDetailPanel'
 import { EventFeed } from './EventFeed'
-import { BUTTON, FeedControls } from './FeedControls'
+import { FeedControls } from './FeedControls'
+import { GameDetailPanel } from './GameDetailPanel'
 import { Scoreboard } from './Scoreboard'
 import { StaleBanner } from './StaleBanner'
 import { StressControls } from './StressControls'
+import { BUTTON } from './styles'
 
 export function LiveBoard({
   seed,
   query,
-  selected,
+  selection,
   related,
 }: {
   seed: number
   query: FeedQuery
-  selected: EventId | undefined
+  selection: Selection | undefined
   related: RelatedScope
 }) {
   const { store, paused, togglePaused, rate, setRate } = useSimulation(seed)
+  const selected = selectionSearch(selection)
   return (
     <main className="mx-auto flex max-w-6xl flex-col gap-6 p-6">
       <header className="flex flex-wrap items-center justify-between gap-3">
@@ -34,19 +37,36 @@ export function LiveBoard({
       </header>
       <StaleBanner store={store} paused={paused} />
       <FeedControls query={query} />
-      <Scoreboard store={store} query={query} />
+      <Scoreboard store={store} query={query} selected={selected.game} />
       <div
         className={
-          selected === undefined
+          selection === undefined
             ? undefined
             : 'grid gap-6 lg:grid-cols-[minmax(0,1fr)_24rem] lg:items-start'
         }
       >
-        <EventFeed store={store} query={query} selected={selected} />
-        {selected === undefined ? null : (
-          <EventDetailPanel store={store} selected={selected} related={related} />
+        <EventFeed store={store} query={query} selected={selected.event} />
+        {selection === undefined ? null : (
+          <SelectionPanel store={store} selection={selection} related={related} />
         )}
       </div>
     </main>
   )
+}
+
+function SelectionPanel({
+  store,
+  selection,
+  related,
+}: {
+  store: FeedStore
+  selection: Selection
+  related: RelatedScope
+}) {
+  switch (selection.kind) {
+    case 'event':
+      return <EventDetailPanel store={store} selected={selection.id} related={related} />
+    case 'game':
+      return <GameDetailPanel store={store} selected={selection.id} />
+  }
 }
