@@ -39,6 +39,8 @@ const GROUPING_LABEL: Readonly<Record<EventGrouping, string>> = {
 
 const FIELD = 'flex flex-col gap-1 text-xs font-medium text-slate-500'
 const INPUT = 'rounded border border-slate-300 bg-white px-2 py-1 text-sm text-slate-900'
+export const BUTTON =
+  'rounded border border-slate-300 px-3 py-1 font-medium text-slate-700 hover:bg-slate-100'
 
 function Select<T extends string>({
   label,
