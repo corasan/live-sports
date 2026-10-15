@@ -24,8 +24,8 @@ import {
   type FeedRow,
 } from '#/feed/view'
 import { describeEvent, eventTime, SEVERITY_STYLE, type Matchup } from './describeEvent'
-import { BUTTON } from './FeedControls'
 import { isPlainKeypress } from './keys'
+import { BUTTON, SELECTED_STYLE } from './styles'
 import { useSearchPatch, useSelect } from './useSearchPatch'
 
 const ROW_HEIGHT = 44
@@ -37,8 +37,6 @@ const SCROLL_THRESHOLD = 1
 const SKELETON_ROWS = 8
 
 const NO_ROWS: readonly FeedRow[] = []
-
-export const SELECTED_STYLE = 'ring-2 ring-sky-500 ring-inset'
 
 const KEY_STEP: ReadonlyMap<string, 1 | -1> = new Map([
   ['ArrowDown', 1],

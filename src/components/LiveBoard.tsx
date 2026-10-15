@@ -3,11 +3,12 @@ import type { FeedQuery, RelatedScope, Selection } from '#/feed/view'
 import { useSimulation } from '#/sim/useSimulation'
 import { EventDetailPanel } from './EventDetailPanel'
 import { EventFeed } from './EventFeed'
-import { BUTTON, FeedControls } from './FeedControls'
+import { FeedControls } from './FeedControls'
 import { GameDetailPanel } from './GameDetailPanel'
 import { Scoreboard } from './Scoreboard'
 import { StaleBanner } from './StaleBanner'
 import { StressControls } from './StressControls'
+import { BUTTON } from './styles'
 
 export function LiveBoard({
   seed,
