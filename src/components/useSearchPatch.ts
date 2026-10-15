@@ -7,7 +7,11 @@ export function useSearchPatch(): (patch: Partial<HomeSearch>) => void {
   const navigate = useNavigate({ from: '/' })
   return useCallback(
     (patch: Partial<HomeSearch>) =>
-      void navigate({ search: (previous) => ({ ...previous, ...patch }), replace: true }),
+      void navigate({
+        search: (previous) => ({ ...previous, ...patch }),
+        replace: true,
+        resetScroll: false,
+      }),
     [navigate],
   )
 }
