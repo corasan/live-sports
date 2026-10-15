@@ -1,15 +1,14 @@
 import { createFileRoute, stripSearchParams } from '@tanstack/react-router'
 import { LiveBoard } from '#/components/LiveBoard'
+import { DEFAULT_QUERY, parseFeedQuery, parseOption, type FeedQuery } from '#/feed/query'
 import {
-  DEFAULT_QUERY,
   DEFAULT_RELATED,
-  parseFeedQuery,
-  parseOption,
+  parseSelection,
   RELATED_SCOPES,
-  type FeedQuery,
+  selectionSearch,
   type RelatedScope,
-} from '#/feed/query'
-import { parseSelection, selectionSearch, type SelectionSearch } from '#/feed/selection'
+  type SelectionSearch,
+} from '#/feed/selection'
 import { parseSeed } from '#/sim/seed'
 
 export type HomeSearch = FeedQuery &

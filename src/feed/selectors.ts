@@ -3,8 +3,9 @@ import { matchupLabel, type Game, type GameStatus } from '#/domain/game'
 import type { EventId, GameId, TeamId } from '#/domain/ids'
 import { eventAt, lookup, type Feed, type Gap } from './feed'
 import { memoizeLast } from './memo'
-import type { EventGrouping, FeedQuery, GameSort, RelatedScope } from './query'
+import type { EventGrouping, FeedQuery, GameSort } from './query'
 import { at, size, type Ring } from './ring'
+import type { RelatedScope } from './selection'
 
 export type DriveSpan = { readonly start: number; readonly end: number }
 
@@ -39,6 +40,8 @@ export type FeedRow =
       readonly game: Game
     }
   | { readonly kind: 'gap'; readonly key: string; readonly gap: Gap }
+
+export type Step = { readonly id: EventId; readonly index: number }
 
 type Section = { readonly key: string; readonly rows: FeedRow[]; pending: number }
 
@@ -228,6 +231,21 @@ const gameDetail = memoizeLast(
 
 export function selectGameDetail(feed: Feed, id: GameId): GameDetail {
   return gameDetail(feed.events, feed.order, feed.games, id)
+}
+
+export function stepSelection(
+  rows: readonly FeedRow[],
+  selected: EventId | undefined,
+  delta: 1 | -1,
+): Step | null {
+  const current = selected === undefined ? -1 : rows.findIndex((row) => row.key === selected)
+  const direction = current === -1 ? 1 : delta
+  for (let index = current + direction; index >= 0 && index < rows.length; index += direction) {
+    const row = rows[index]
+    if (row.kind === 'event') return { id: row.key, index }
+  }
+  const stay = rows.at(current)
+  return current !== -1 && stay?.kind === 'event' ? { id: stay.key, index: current } : null
 }
 
 const newEventCount = memoizeLast(

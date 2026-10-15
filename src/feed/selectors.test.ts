@@ -6,7 +6,8 @@ import { ROSTERS } from '#/domain/roster'
 import { createFeed, ingest, receive, type Feed } from './feed'
 import { feedEvents, gamesOf, ingestTicks, simulate, simulatedFeed, TICK_MS } from './fixtures'
 import { size } from './ring'
-import { DEFAULT_QUERY, toggleLeague, type FeedQuery, type RelatedScope } from './query'
+import { DEFAULT_QUERY, toggleLeague, type FeedQuery } from './query'
+import type { RelatedScope } from './selection'
 import {
   countNewEvents,
   selectEventDetail,
@@ -15,9 +16,9 @@ import {
   selectFeedView,
   selectHeldView,
   selectVisibleGames,
+  stepSelection,
   type FeedRow,
 } from './selectors'
-import { stepSelection } from './selection'
 
 const { feed, events: emitted } = simulatedFeed(7, 120, 20_000)
 
@@ -410,5 +411,39 @@ describe('selectGameDetail', () => {
     const later = ingestTicks(feed, simulate(7, 140).batches.slice(120))
     expect(size(later.order)).toBeGreaterThan(size(feed.order))
     expect(selectGameDetail(later, selected)).not.toBe(first)
+  })
+})
+
+describe('stepSelection', () => {
+  const rows = selectFeedRows(feed, query({ group: 'game' }))
+  const ids = eventsOf(rows).map((event) => event.id)
+  const headers = rows.filter((row) => row.kind === 'group').map((row) => row.key)
+
+  it('starts at the first event row in either direction when nothing is selected', () => {
+    expect(rows[0].kind).toBe('group')
+    expect(stepSelection(rows, undefined, 1)).toEqual({ id: ids[0], index: 1 })
+    expect(stepSelection(rows, undefined, -1)?.id).toBe(ids[0])
+    expect(stepSelection(rows, eventId(999_999), -1)?.id).toBe(ids[0])
+  })
+
+  it('walks every event row in order, skipping group headers', () => {
+    const visited = [ids[0]]
+    for (let i = 1; i < ids.length; i++) {
+      const step = stepSelection(rows, visited[i - 1], 1)
+      expect(step === null ? null : rows[step.index].key).toBe(step?.id)
+      visited.push(step?.id ?? ids[0])
+    }
+    expect(visited).toEqual(ids)
+    expect(headers.length).toBeGreaterThan(1)
+  })
+
+  it('clamps at both ends instead of wrapping', () => {
+    expect(stepSelection(rows, ids[0], -1)?.id).toBe(ids[0])
+    expect(stepSelection(rows, ids.at(-1), 1)?.id).toBe(ids.at(-1))
+  })
+
+  it('selects nothing when there are no event rows', () => {
+    expect(stepSelection([], undefined, 1)).toBeNull()
+    expect(stepSelection([{ kind: 'group', key: 'group:x', label: 'X' }], ids[0], -1)).toBeNull()
   })
 })

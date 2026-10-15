@@ -1,5 +1,10 @@
 import { parseEventId, parseGameId, type EventId, type GameId } from '#/domain/ids'
-import type { FeedRow } from './selectors'
+
+export const RELATED_SCOPES = ['game', 'drive'] as const
+
+export type RelatedScope = (typeof RELATED_SCOPES)[number]
+
+export const DEFAULT_RELATED: RelatedScope = 'game'
 
 export type Selection =
   | { readonly kind: 'event'; readonly id: EventId }
@@ -9,8 +14,6 @@ export type SelectionSearch = {
   readonly event: EventId | undefined
   readonly game: GameId | undefined
 }
-
-export type Step = { readonly id: EventId; readonly index: number }
 
 export function parseSelection(raw: {
   readonly event?: string
@@ -27,19 +30,4 @@ export function selectionSearch(selection: Selection | undefined): SelectionSear
     event: selection?.kind === 'event' ? selection.id : undefined,
     game: selection?.kind === 'game' ? selection.id : undefined,
   }
-}
-
-export function stepSelection(
-  rows: readonly FeedRow[],
-  selected: EventId | undefined,
-  delta: 1 | -1,
-): Step | null {
-  const current = selected === undefined ? -1 : rows.findIndex((row) => row.key === selected)
-  const direction = current === -1 ? 1 : delta
-  for (let index = current + direction; index >= 0 && index < rows.length; index += direction) {
-    const row = rows[index]
-    if (row.kind === 'event') return { id: row.key, index }
-  }
-  const stay = rows.at(current)
-  return current !== -1 && stay?.kind === 'event' ? { id: stay.key, index: current } : null
 }

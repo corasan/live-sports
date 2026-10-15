@@ -6,11 +6,9 @@ import { ROSTER, ROSTERS } from '#/domain/roster'
 export const SEVERITIES = ['info', 'notable', 'critical'] as const satisfies readonly Severity[]
 export const GAME_SORT_OPTIONS = ['schedule', 'closest', 'league'] as const
 export const EVENT_GROUPINGS = ['none', 'game', 'league'] as const
-export const RELATED_SCOPES = ['game', 'drive'] as const
 
 export type GameSort = (typeof GAME_SORT_OPTIONS)[number]
 export type EventGrouping = (typeof EVENT_GROUPINGS)[number]
-export type RelatedScope = (typeof RELATED_SCOPES)[number]
 
 export type FeedQuery = {
   readonly teams: readonly TeamId[]
@@ -27,8 +25,6 @@ export const DEFAULT_QUERY: FeedQuery = {
   sort: 'schedule',
   group: 'none',
 }
-
-export const DEFAULT_RELATED: RelatedScope = 'game'
 
 export function parseOption<T extends string>(
   options: readonly T[],
