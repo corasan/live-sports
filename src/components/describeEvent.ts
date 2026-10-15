@@ -26,8 +26,12 @@ function teamName(matchup: Matchup, id: TeamId): string {
   return id === matchup.home.id ? matchup.home.name : matchup.away.name
 }
 
+export function clockTime(ts: number): string {
+  return new Date(ts).toLocaleTimeString()
+}
+
 export function eventTime(event: GameEvent): string {
-  return new Date(event.ts).toLocaleTimeString()
+  return clockTime(event.ts)
 }
 
 export function describeEvent(event: GameEvent, matchup: Matchup): string {

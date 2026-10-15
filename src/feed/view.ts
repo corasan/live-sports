@@ -2,7 +2,7 @@ import type { GameEvent, Severity } from '#/domain/event'
 import { matchupLabel, type Game, type GameStatus, type League, type Team } from '#/domain/game'
 import { parseEventId, parseGameId, type EventId, type GameId, type TeamId } from '#/domain/ids'
 import { ROSTER, ROSTERS } from '#/domain/roster'
-import { eventAt, lookup, type Feed } from './feed'
+import { eventAt, lookup, type Feed, type Gap } from './feed'
 import { memoizeLast } from './memo'
 import { at, size, type Ring } from './ring'
 
@@ -76,6 +76,9 @@ export type FeedRow =
       readonly event: GameEvent
       readonly game: Game
     }
+  | { readonly kind: 'gap'; readonly key: string; readonly gap: Gap }
+
+type Section = { readonly key: string; readonly rows: FeedRow[]; pending: number }
 
 const SEVERITY_RANK: Readonly<Record<Severity, number>> = {
   info: 0,
@@ -206,6 +209,7 @@ const feedRows = memoizeLast(
     games: ReadonlyMap<GameId, Game>,
     events: ReadonlyMap<EventId, GameEvent>,
     order: Ring<EventId>,
+    gaps: readonly Gap[],
     teams: readonly TeamId[],
     severity: Severity,
     q: string,
@@ -213,20 +217,32 @@ const feedRows = memoizeLast(
   ): readonly FeedRow[] => {
     const passes = eventMatcher(games, teams, severity, q)
     const groupOf = GROUPINGS[group]
-    const groups = new Map<string, FeedRow[]>()
+    const newestGaps = gaps.toReversed()
+    const sections = new Map<string, Section>()
+    const emitGapsAbove = (section: Section, index: number) => {
+      while (section.pending < newestGaps.length && newestGaps[section.pending].at > index) {
+        const gap = newestGaps[section.pending]
+        section.rows.push({ kind: 'gap', key: `gap:${section.key}:${gap.at}`, gap })
+        section.pending++
+      }
+    }
     for (let age = 0; age < size(order); age++) {
       const event = lookup(events, at(order, age))
       if (!passes(event)) continue
       const game = lookup(games, event.gameId)
       const { key, label } = groupOf(game)
-      let rows = groups.get(key)
-      if (rows === undefined) {
-        rows = label === null ? [] : [{ kind: 'group', key: `group:${key}`, label }]
-        groups.set(key, rows)
+      let section = sections.get(key)
+      if (section === undefined) {
+        const rows: FeedRow[] =
+          label === null ? [] : [{ kind: 'group', key: `group:${key}`, label }]
+        section = { key, rows, pending: 0 }
+        sections.set(key, section)
       }
-      rows.push({ kind: 'event', key: event.id, event, game })
+      emitGapsAbove(section, order.written - 1 - age)
+      section.rows.push({ kind: 'event', key: event.id, event, game })
     }
-    return [...groups.values()].flat()
+    for (const section of sections.values()) emitGapsAbove(section, -1)
+    return [...sections.values()].flatMap((section) => section.rows)
   },
 )
 
@@ -235,6 +251,7 @@ export function selectFeedRows(feed: Feed, query: FeedQuery): readonly FeedRow[]
     feed.games,
     feed.events,
     feed.order,
+    feed.gaps,
     query.teams,
     query.severity,
     query.q,
