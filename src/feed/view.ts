@@ -281,6 +281,11 @@ export function selectFeedView(feed: Feed, query: FeedQuery): FeedView {
   return rows.length === 0 ? NO_MATCHES : rowsView(rows)
 }
 
+export function selectHeldView(snapshot: Feed, query: FeedQuery): FeedView {
+  const view = selectFeedView(snapshot, query)
+  return view === LOADING ? EMPTY : view
+}
+
 export function clearFilters(query: FeedQuery): FeedQuery {
   const { league, severity, q } = DEFAULT_QUERY
   return { ...query, league, severity, q }

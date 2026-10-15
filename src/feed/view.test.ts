@@ -13,6 +13,7 @@ import {
   selectEventDetail,
   selectFeedRows,
   selectFeedView,
+  selectHeldView,
   selectVisibleGames,
   stepSelection,
   type FeedQuery,
@@ -173,6 +174,14 @@ describe('selectFeedView', () => {
 
   it('is loading until the first sync', () => {
     expect(selectFeedView(createFeed(initial), DEFAULT_QUERY).kind).toBe('loading')
+  })
+
+  it('shows a snapshot held before the first sync as empty rather than loading', () => {
+    expect(selectHeldView(createFeed(initial), DEFAULT_QUERY).kind).toBe('empty')
+  })
+
+  it('shows a synced held snapshot the same as the live view', () => {
+    expect(selectHeldView(feed, DEFAULT_QUERY)).toBe(selectFeedView(feed, DEFAULT_QUERY))
   })
 
   it('is empty once synced with no events in the ring', () => {

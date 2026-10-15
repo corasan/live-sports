@@ -18,6 +18,7 @@ import {
   clearFilters,
   countNewEvents,
   selectFeedView,
+  selectHeldView,
   stepSelection,
   type FeedQuery,
   type FeedRow,
@@ -172,7 +173,9 @@ export function EventFeed({
   const held = paused || scrolledAway
   if (held && snapshot === null) setSnapshot(store.getState())
   if (!held && snapshot !== null) setSnapshot(null)
-  const view = useStore(store, (feed) => selectFeedView(snapshot ?? feed, query))
+  const view = useStore(store, (feed) =>
+    snapshot === null ? selectFeedView(feed, query) : selectHeldView(snapshot, query),
+  )
   const rows = view.kind === 'rows' ? view.rows : NO_ROWS
   const patch = useSearchPatch()
   const select = useCallback((event: EventId) => patch({ event }), [patch])
@@ -218,14 +221,14 @@ export function EventFeed({
           {paused ? 'Resume feed' : 'Pause feed'}
         </button>
       </div>
-      {view.kind === 'loading' ? (
-        <FeedSkeleton />
-      ) : view.kind === 'empty' ? (
-        <FeedMessage title="No events yet">
-          <p className="text-slate-500">Events appear here once games tip off.</p>
-        </FeedMessage>
-      ) : (
-        <div className="relative">
+      <div className="relative">
+        {view.kind === 'loading' ? (
+          <FeedSkeleton />
+        ) : view.kind === 'empty' ? (
+          <FeedMessage title="No events yet">
+            <p className="text-slate-500">Events appear here once games tip off.</p>
+          </FeedMessage>
+        ) : (
           <div
             ref={scrollRef}
             onScroll={(event) => setScrolledAway(event.currentTarget.scrollTop > SCROLL_THRESHOLD)}
@@ -247,11 +250,11 @@ export function EventFeed({
               </ol>
             )}
           </div>
-          {snapshot !== null && (
-            <NewEventsPill store={store} snapshot={snapshot} query={query} onClick={jumpToLatest} />
-          )}
-        </div>
-      )}
+        )}
+        {snapshot !== null && (
+          <NewEventsPill store={store} snapshot={snapshot} query={query} onClick={jumpToLatest} />
+        )}
+      </div>
     </section>
   )
 }
