@@ -197,6 +197,7 @@ export function EventFeed({
   const view = useStore(store, (feed) =>
     snapshot === null ? selectFeedView(feed, query) : selectHeldView(snapshot, query),
   )
+  const reconnecting = useStore(store, (feed) => feed.connection.kind === 'reconnecting')
   const rows = view.kind === 'rows' ? view.rows : NO_ROWS
   const choose = useSelect()
   const select = useCallback((id: EventId) => choose({ kind: 'event', id }), [choose])
@@ -233,7 +234,14 @@ export function EventFeed({
   return (
     <section className="flex min-w-0 flex-col gap-2">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold">Feed</h2>
+        <div className="flex items-center gap-2">
+          <h2 className="text-lg font-semibold">Feed</h2>
+          {reconnecting && (
+            <span className="rounded-full bg-rose-100 px-2 py-0.5 text-xs font-medium text-rose-800">
+              Reconnecting…
+            </span>
+          )}
+        </div>
         <button
           type="button"
           onClick={() => setPaused((value) => !value)}
@@ -253,7 +261,8 @@ export function EventFeed({
           <div
             ref={scrollRef}
             onScroll={(event) => setScrolledAway(event.currentTarget.scrollTop > SCROLL_THRESHOLD)}
-            className="h-[60vh] overflow-y-auto"
+            aria-busy={reconnecting || undefined}
+            className={`h-[60vh] overflow-y-auto transition-opacity ${reconnecting ? 'opacity-50' : ''}`}
           >
             {view.kind === 'no-matches' ? (
               <NoMatches query={query} />
