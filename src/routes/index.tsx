@@ -21,9 +21,10 @@ export type HomeSearch = FeedQuery & {
 export const Route = createFileRoute('/')({
   validateSearch: (search: Partial<HomeSearch>): HomeSearch => ({
     seed: parseSeed(String(search.seed)),
-    ...parseFeedQuery(
-      Object.fromEntries(Object.entries(search).map(([key, value]) => [key, String(value)])),
-    ),
+    ...parseFeedQuery({
+      ...Object.fromEntries(Object.entries(search).map(([key, value]) => [key, String(value)])),
+      teams: search.teams,
+    }),
     event: parseEventId(String(search.event)),
     related: parseOption(RELATED_SCOPES, String(search.related), DEFAULT_RELATED),
   }),

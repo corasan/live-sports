@@ -1,8 +1,9 @@
 import type { EventDraft, EventKind, GameEvent, Market } from '#/domain/event'
 import { applyEvent, leaderOf, LEAGUES, type Game, type League, type Odds } from '#/domain/game'
-import { eventId, gameId, teamId, type GameId, type TeamId } from '#/domain/ids'
+import { eventId, gameId, type GameId, type TeamId } from '#/domain/ids'
 import { LEAGUE_RULES, type LeagueRules, type MarketRules, type PlayKind } from './leagues'
 import { createRng, type Rng } from './rng'
+import { ROSTERS } from './roster'
 import { severityOf } from './severity'
 
 export type SimGame = {
@@ -160,10 +161,7 @@ function advance(entry: SimGame, tick: number, rules: LeagueRules, rng: Rng): Pr
 
 function seedLeague(league: League, firstGame: number, rng: Rng): SimGame[] {
   const rules = LEAGUE_RULES[league]
-  const teams = rng.shuffle(rules.teams).map((name) => ({
-    id: teamId(`${league}-${name}`.toLowerCase().replaceAll(/[^a-z0-9]+/gu, '-')),
-    name,
-  }))
+  const teams = rng.shuffle(ROSTERS[league])
   return Array.from({ length: rules.games }, (_, index) =>
     scheduled(
       {

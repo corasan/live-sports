@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import type { GameEvent } from '#/domain/event'
 import type { Game } from '#/domain/game'
-import { eventId, type EventId } from '#/domain/ids'
+import { eventId, type EventId, type TeamId } from '#/domain/ids'
+import { ROSTERS } from '#/sim/roster'
 import { createFeed, ingest, type Feed } from './feed'
 import { feedEvents, gamesOf, ingestTicks, simulate, simulatedFeed, TICK_MS } from './fixtures'
 import { size } from './ring'
@@ -9,6 +10,7 @@ import {
   clearFilters,
   countNewEvents,
   DEFAULT_QUERY,
+  leagueSelection,
   parseFeedQuery,
   selectEventDetail,
   selectFeedRows,
@@ -16,6 +18,8 @@ import {
   selectHeldView,
   selectVisibleGames,
   stepSelection,
+  toggleLeague,
+  toggleTeam,
   type FeedQuery,
   type FeedRow,
   type RelatedScope,
@@ -28,6 +32,8 @@ const STATUS_ORDER = { live: 0, scheduled: 1, final: 2 }
 function margin(game: Game): number {
   return Math.abs(game.score.home - game.score.away)
 }
+
+const NBA = ROSTERS.NBA.map((team) => team.id)
 
 function query(overrides: Partial<FeedQuery>): FeedQuery {
   return { ...DEFAULT_QUERY, ...overrides }
@@ -47,10 +53,33 @@ function sections(rows: readonly FeedRow[]): { label: string; events: GameEvent[
 }
 
 describe('selectVisibleGames', () => {
-  it('keeps only games in the chosen league, in schedule order', () => {
-    const games = selectVisibleGames(feed, query({ league: 'NHL' }))
+  it('shows every game in schedule order when no team is picked', () => {
+    expect(selectVisibleGames(feed, DEFAULT_QUERY)).toEqual(gamesOf(feed))
+  })
+
+  it("keeps exactly the picked team's games, home or away", () => {
+    const team = gamesOf(feed)[0].away
+    const games = selectVisibleGames(feed, query({ teams: [team.id] }))
+    expect(games.length).toBeGreaterThan(0)
+    expect(games.length).toBeLessThan(gamesOf(feed).length)
+    expect(games).toEqual(
+      gamesOf(feed).filter((game) => [game.home.name, game.away.name].includes(team.name)),
+    )
+  })
+
+  it("keeps the league's games when a whole sport is picked", () => {
+    const games = selectVisibleGames(feed, query({ teams: toggleLeague([], 'NHL') }))
     expect(games.length).toBeGreaterThan(0)
     expect(games).toEqual(gamesOf(feed).filter((game) => game.league === 'NHL'))
+  })
+
+  it('intersects the picked teams with the search', () => {
+    const nba = query({ teams: NBA })
+    expect(selectVisibleGames(feed, { ...nba, q: ROSTERS.NHL[0].name })).toEqual([])
+    const name = ROSTERS.NBA[0].name
+    expect(selectVisibleGames(feed, { ...nba, q: name })).toEqual(
+      gamesOf(feed).filter((game) => [game.home.name, game.away.name].includes(name)),
+    )
   })
 
   it('matches team names case-insensitively, ignoring surrounding whitespace', () => {
@@ -133,7 +162,7 @@ describe('countNewEvents', () => {
 
   it.each([
     ['severity', query({ severity: 'notable' })],
-    ['league', query({ league: 'NBA' })],
+    ['team', query({ teams: NBA })],
   ])('respects the %s filter', (_, filtered) => {
     const fresh = newVisibleIds(filtered)
     expect(fresh.length).toBeGreaterThan(0)
@@ -160,12 +189,12 @@ describe('memoization', () => {
     ['selectVisibleGames', (target: Feed, q: FeedQuery) => selectVisibleGames(target, q)],
     ['selectFeedRows', (target: Feed, q: FeedQuery) => selectFeedRows(target, q)],
   ])('%s returns the cached result until the feed or a query field changes', (_, select) => {
-    const base = query({ league: 'NBA' })
+    const base = query({ teams: NBA })
     const first = select(before, base)
-    expect(select(before, { ...base })).toBe(first)
+    expect(select(before, { ...base, teams: [...NBA] })).toBe(first)
     const ingested = select(after, base)
     expect(ingested).not.toBe(first)
-    expect(select(after, query({ league: 'NHL' }))).not.toBe(ingested)
+    expect(select(after, query({ teams: NBA.slice(1) }))).not.toBe(ingested)
   })
 })
 
@@ -200,17 +229,17 @@ describe('selectFeedView', () => {
   })
 
   it('returns the same view across repeated calls and heartbeats', () => {
-    const first = selectFeedView(feed, query({ league: 'NBA' }))
+    const first = selectFeedView(feed, query({ teams: NBA }))
     expect(first.kind).toBe('rows')
-    expect(selectFeedView(feed, query({ league: 'NBA' }))).toBe(first)
-    expect(selectFeedView(ingest(feed, [], Date.now()), query({ league: 'NBA' }))).toBe(first)
+    expect(selectFeedView(feed, query({ teams: [...NBA] }))).toBe(first)
+    expect(selectFeedView(ingest(feed, [], Date.now()), query({ teams: NBA }))).toBe(first)
   })
 })
 
 describe('clearFilters', () => {
-  it('resets league, severity, and search but keeps sort and grouping', () => {
+  it('resets teams, severity, and search but keeps sort and grouping', () => {
     const cleared = clearFilters({
-      league: 'NHL',
+      teams: NBA,
       severity: 'critical',
       q: 'hawks',
       sort: 'closest',
@@ -223,8 +252,47 @@ describe('clearFilters', () => {
 describe('parseFeedQuery', () => {
   it('keeps valid fields and falls back per field for the rest', () => {
     expect(
-      parseFeedQuery({ league: 'NFL', severity: 'loud', q: 'hawks', sort: 'closest' }),
-    ).toEqual({ league: 'NFL', severity: 'info', q: 'hawks', sort: 'closest', group: 'none' })
+      parseFeedQuery({ teams: [NBA[0]], severity: 'loud', q: 'hawks', sort: 'closest' }),
+    ).toEqual({ teams: [NBA[0]], severity: 'info', q: 'hawks', sort: 'closest', group: 'none' })
+  })
+
+  it('keeps only known team ids, deduped in roster order', () => {
+    const nhl = ROSTERS.NHL[0].id
+    expect(parseFeedQuery({ teams: [nhl, 'nba-nobody', NBA[2], 7, NBA[0], nhl] }).teams).toEqual([
+      NBA[0],
+      NBA[2],
+      nhl,
+    ])
+  })
+
+  it.each([['nba-harbor-hawks'], [{ 0: NBA[0] }], [null], [undefined]])(
+    'falls back to no teams for %j',
+    (teams) => {
+      expect(parseFeedQuery({ teams }).teams).toEqual([])
+    },
+  )
+})
+
+describe('team selection', () => {
+  it('reports a sport as all, some, or none of its teams picked', () => {
+    expect(leagueSelection([], 'NBA')).toBe('none')
+    expect(leagueSelection([NBA[1]], 'NBA')).toBe('some')
+    expect(leagueSelection(NBA, 'NBA')).toBe('all')
+    expect(leagueSelection(NBA, 'NFL')).toBe('none')
+  })
+
+  it('completes a partly picked sport, then clears it without touching other teams', () => {
+    const nfl: TeamId = ROSTERS.NFL[1].id
+    const partial = [NBA[3], nfl]
+    const full = toggleLeague(partial, 'NBA')
+    expect(full).toEqual([...NBA, nfl])
+    expect(toggleLeague(full, 'NBA')).toEqual([nfl])
+  })
+
+  it('adds a team in roster order and removes it on the second toggle', () => {
+    const added = toggleTeam([NBA[3]], NBA[1])
+    expect(added).toEqual([NBA[1], NBA[3]])
+    expect(toggleTeam(added, NBA[3])).toEqual([NBA[1]])
   })
 })
 
