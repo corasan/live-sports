@@ -7,11 +7,11 @@ import { createFeed, ingest, receive, type Feed } from './feed'
 import { feedEvents, gamesOf, ingestTicks, simulate, simulatedFeed, TICK_MS } from './fixtures'
 import { size } from './ring'
 import { DEFAULT_QUERY, toggleLeague, type FeedQuery } from './query'
-import type { RelatedScope } from './selection'
+import type { Selection } from './selection'
 import {
   countNewEvents,
-  selectEventDetail,
-  selectGameDetail,
+  selectDetail,
+  selectedGame,
   selectFeedRows,
   selectFeedView,
   selectHeldView,
@@ -396,104 +396,70 @@ describe('selectFeedView', () => {
   })
 })
 
-describe('selectEventDetail', () => {
-  const selected = emitted.find((event) => {
-    const peers = emitted.filter((other) => other.gameId === event.gameId)
-    const drive = peers.filter((other) => other.drive === event.drive)
-    return drive.length > 2 && peers.length > drive.length
-  })
-  if (selected === undefined) throw new Error('fixture has no multi-event drive')
+function found(target: Feed, selection: Selection) {
+  const detail = selectDetail(target, selection)
+  if (detail.kind !== 'found') throw new Error('expected the selection to be found')
+  return detail
+}
 
-  const found = (scope: RelatedScope) => {
-    const detail = selectEventDetail(feed, selected.id, scope)
-    if (detail.kind !== 'found') throw new Error('expected the selected event to be found')
-    return detail
-  }
-
-  it('returns the event, its game, and the full chronological timeline of that game', () => {
-    const detail = found('game')
-    expect(detail.event).toBe(selected)
-    expect(detail.game).toBe(feed.games.get(selected.gameId))
-    expect(detail.timeline).toEqual(emitted.filter((event) => event.gameId === selected.gameId))
-    const stamps = detail.timeline.map((event) => event.ts)
-    expect(stamps).toEqual(stamps.toSorted((a, b) => a - b))
-  })
-
-  it('lists the rest of the game newest first for the game scope', () => {
-    const detail = found('game')
-    expect(detail.related).toEqual(
-      detail.timeline.toReversed().filter((event) => event.id !== selected.id),
-    )
-  })
-
-  it('spans the selected drive from its first to its last event', () => {
-    const stamps = emitted
-      .filter((event) => event.gameId === selected.gameId && event.drive === selected.drive)
-      .map((event) => event.ts)
-    expect(found('game').driveSpan).toEqual({ start: stamps[0], end: stamps.at(-1) })
-  })
-
-  it('narrows the drive scope to a strict subset sharing the game and drive', () => {
-    const drive = found('drive').related
-    const game = found('game').related
-    expect(drive.length).toBeGreaterThan(0)
-    expect(drive.length).toBeLessThan(game.length)
-    for (const event of drive) {
-      expect(event.gameId).toBe(selected.gameId)
-      expect(event.drive).toBe(selected.drive)
-    }
-    expect(game.filter((event) => drive.includes(event))).toEqual(drive)
-    expect(drive).not.toContain(selected)
-  })
-
-  it('reports missing for an unknown id and for an evicted event', () => {
-    expect(selectEventDetail(feed, eventId(999_999), 'game')).toEqual({ kind: 'missing' })
-    const small = simulatedFeed(7, 120, 50)
-    expect(selectEventDetail(small.feed, small.events[0].id, 'game')).toEqual({ kind: 'missing' })
-  })
-
-  it('returns the cached detail until an input changes', () => {
-    const first = selectEventDetail(feed, selected.id, 'drive')
-    expect(selectEventDetail(feed, selected.id, 'drive')).toBe(first)
-    expect(selectEventDetail(feed, selected.id, 'game')).not.toBe(first)
-  })
-})
-
-describe('selectGameDetail', () => {
-  const selected = emitted[emitted.length >> 1].gameId
+describe('selectDetail', () => {
+  const focused = emitted[emitted.length >> 1]
+  const selected = focused.gameId
   const ofGame = emitted.filter((event) => event.gameId === selected)
 
-  const found = (target: Feed) => {
-    const detail = selectGameDetail(target, selected)
-    if (detail.kind !== 'found') throw new Error('expected the selected game to be found')
-    return detail
-  }
-
-  it('returns the game with exactly its events oldest first on the timeline', () => {
-    const detail = found(feed)
+  it('returns a selected game with its events oldest first on the timeline and newest first in recent', () => {
+    const detail = found(feed, { kind: 'game', id: selected })
     expect(ofGame.length).toBeGreaterThan(1)
     expect(detail.game).toBe(feed.games.get(selected))
     expect(detail.timeline).toEqual(ofGame)
+    expect(detail.recent).toEqual(ofGame.toReversed())
+    expect(detail.focus).toBeNull()
   })
 
-  it('lists recent events newest first', () => {
-    expect(found(feed).recent).toEqual(ofGame.toReversed())
+  it('resolves a selected event to its game and focuses that event', () => {
+    const detail = found(feed, { kind: 'event', id: focused.id })
+    expect(detail.game).toBe(feed.games.get(selected))
+    expect(detail.timeline).toEqual(ofGame)
+    expect(detail.focus).toBe(focused.id)
+    expect(detail.recent).toContain(focused)
   })
 
-  it('reports missing for an unknown id and for a game evicted from the feed', () => {
-    expect(selectGameDetail(feed, gameId('nba-999999'))).toEqual({ kind: 'missing' })
+  it('reports missing for unknown ids, an evicted event, and an evicted game', () => {
+    expect(selectDetail(feed, { kind: 'event', id: eventId(999_999) })).toEqual({
+      kind: 'missing',
+    })
+    expect(selectDetail(feed, { kind: 'game', id: gameId('nba-999999') })).toEqual({
+      kind: 'missing',
+    })
     const small = simulatedFeed(7, 400, 50)
+    expect(selectDetail(small.feed, { kind: 'event', id: small.events[0].id })).toEqual({
+      kind: 'missing',
+    })
     const evicted = small.events.find((event) => !small.feed.games.has(event.gameId))
     if (evicted === undefined) throw new Error('fixture evicted no game')
-    expect(selectGameDetail(small.feed, evicted.gameId)).toEqual({ kind: 'missing' })
+    expect(selectDetail(small.feed, { kind: 'game', id: evicted.gameId })).toEqual({
+      kind: 'missing',
+    })
   })
 
-  it('returns the cached detail across heartbeats until the ring changes', () => {
-    const first = found(feed)
-    expect(found(ingest(feed, [], Date.now()))).toBe(first)
+  it('returns the cached detail across heartbeats until the ring or focus changes', () => {
+    const first = found(feed, { kind: 'event', id: focused.id })
+    expect(found(ingest(feed, [], Date.now()), { kind: 'event', id: focused.id })).toBe(first)
+    expect(found(feed, { kind: 'game', id: selected })).not.toBe(first)
     const later = ingestTicks(feed, simulate(7, 140).batches.slice(120))
     expect(size(later.order)).toBeGreaterThan(size(feed.order))
-    expect(selectGameDetail(later, selected)).not.toBe(first)
+    expect(found(later, { kind: 'event', id: focused.id })).not.toBe(first)
+  })
+})
+
+describe('selectedGame', () => {
+  const event = emitted[emitted.length >> 1]
+
+  it('marks the selected game, or the game an in-feed selected event belongs to', () => {
+    expect(selectedGame(feed, undefined)).toBeUndefined()
+    expect(selectedGame(feed, { kind: 'game', id: event.gameId })).toBe(event.gameId)
+    expect(selectedGame(feed, { kind: 'event', id: event.id })).toBe(event.gameId)
+    expect(selectedGame(feed, { kind: 'event', id: eventId(999_999) })).toBeUndefined()
   })
 })
 

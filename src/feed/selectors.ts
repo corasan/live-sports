@@ -5,30 +5,18 @@ import { eventAt, lookup, type Feed, type Gap } from './feed'
 import { memoizeLast } from './memo'
 import type { EventGrouping, FeedQuery, GameSort } from './query'
 import { at, size, type Ring } from './ring'
-import type { RelatedScope } from './selection'
-
-export type DriveSpan = { readonly start: number; readonly end: number }
+import type { Selection } from './selection'
 
 type Missing = { readonly kind: 'missing' }
 
-export type EventDetail =
-  | Missing
-  | {
-      readonly kind: 'found'
-      readonly event: GameEvent
-      readonly game: Game
-      readonly timeline: readonly GameEvent[]
-      readonly driveSpan: DriveSpan
-      readonly related: readonly GameEvent[]
-    }
-
-export type GameDetail =
+export type Detail =
   | Missing
   | {
       readonly kind: 'found'
       readonly game: Game
       readonly timeline: readonly GameEvent[]
       readonly recent: readonly GameEvent[]
+      readonly focus: EventId | null
     }
 
 export type FeedRow =
@@ -82,12 +70,6 @@ const GROUPINGS: Readonly<
 }
 
 const MISSING: Missing = { kind: 'missing' }
-
-const IN_SCOPE: Readonly<Record<RelatedScope, (selected: GameEvent, other: GameEvent) => boolean>> =
-  {
-    game: () => true,
-    drive: (selected, other) => other.drive === selected.drive,
-  }
 
 function gameMatcher(teams: readonly TeamId[], q: string): (game: Game) => boolean {
   const needle = q.trim().toLowerCase()
@@ -208,50 +190,42 @@ function gameEventsNewestFirst(
   return newestFirst
 }
 
-const eventDetail = memoizeLast(
-  (
-    events: ReadonlyMap<EventId, GameEvent>,
-    order: Ring<EventId>,
-    games: ReadonlyMap<GameId, Game>,
-    id: EventId,
-    scope: RelatedScope,
-  ): EventDetail => {
-    const event = events.get(id)
-    if (event === undefined) return MISSING
-    const newestFirst = gameEventsNewestFirst(events, order, event.gameId)
-    const inScope = IN_SCOPE[scope]
-    const drive = newestFirst.filter((other) => IN_SCOPE.drive(event, other))
-    return {
-      kind: 'found',
-      event,
-      game: lookup(games, event.gameId),
-      timeline: newestFirst.toReversed(),
-      driveSpan: { start: (drive.at(-1) ?? event).ts, end: (drive.at(0) ?? event).ts },
-      related: newestFirst.filter((other) => other.id !== event.id && inScope(event, other)),
-    }
-  },
-)
-
-export function selectEventDetail(feed: Feed, id: EventId, scope: RelatedScope): EventDetail {
-  return eventDetail(feed.events, feed.order, feed.games, id, scope)
-}
-
-const gameDetail = memoizeLast(
+const detail = memoizeLast(
   (
     events: ReadonlyMap<EventId, GameEvent>,
     order: Ring<EventId>,
     games: ReadonlyMap<GameId, Game>,
     id: GameId,
-  ): GameDetail => {
+    focus: EventId | null,
+  ): Detail => {
     const game = games.get(id)
     if (game === undefined) return MISSING
     const recent = gameEventsNewestFirst(events, order, id)
-    return { kind: 'found', game, timeline: recent.toReversed(), recent }
+    return { kind: 'found', game, timeline: recent.toReversed(), recent, focus }
   },
 )
 
-export function selectGameDetail(feed: Feed, id: GameId): GameDetail {
-  return gameDetail(feed.events, feed.order, feed.games, id)
+export function selectDetail(feed: Feed, selection: Selection): Detail {
+  switch (selection.kind) {
+    case 'game':
+      return detail(feed.events, feed.order, feed.games, selection.id, null)
+    case 'event': {
+      const event = feed.events.get(selection.id)
+      if (event === undefined) return MISSING
+      return detail(feed.events, feed.order, feed.games, event.gameId, event.id)
+    }
+  }
+}
+
+export function selectedGame(feed: Feed, selection: Selection | undefined): GameId | undefined {
+  switch (selection?.kind) {
+    case undefined:
+      return undefined
+    case 'game':
+      return selection.id
+    case 'event':
+      return feed.events.get(selection.id)?.gameId
+  }
 }
 
 export function stepSelection(

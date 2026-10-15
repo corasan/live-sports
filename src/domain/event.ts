@@ -11,7 +11,6 @@ type EventBase = {
   readonly id: EventId
   readonly ts: number
   readonly gameId: GameId
-  readonly drive: number
   readonly severity: Severity
 }
 

@@ -2,12 +2,10 @@ import { useEffect, type ReactNode } from 'react'
 import type { GameEvent } from '#/domain/event'
 import type { Game } from '#/domain/game'
 import type { EventId } from '#/domain/ids'
-import type { DriveSpan } from '#/feed/selectors'
 import { describeEvent, eventTime, SEVERITY_DOT, SEVERITY_STYLE } from './describeEvent'
 import { isPlainKeypress } from './keys'
+import { SELECTED_ACCENT, SELECTED_STYLE } from './styles'
 import { useSelect } from './useSearchPatch'
-
-type TimelineFocus = { readonly event: EventId; readonly driveSpan: DriveSpan }
 
 export function MiniTimeline({
   timeline,
@@ -16,7 +14,7 @@ export function MiniTimeline({
   onSelect,
 }: {
   timeline: readonly GameEvent[]
-  focus: TimelineFocus | null
+  focus: EventId | null
   game: Game
   onSelect: (id: EventId) => void
 }) {
@@ -27,17 +25,8 @@ export function MiniTimeline({
   return (
     <div className="relative h-8" role="group" aria-label="Game timeline">
       <div className="absolute inset-x-0 top-1/2 h-px bg-slate-200" />
-      {focus === null ? null : (
-        <div
-          className="absolute inset-y-1 min-w-1 -translate-x-0.5 rounded bg-sky-100"
-          style={{
-            left: `${offset(focus.driveSpan.start)}%`,
-            width: `${offset(focus.driveSpan.end) - offset(focus.driveSpan.start)}%`,
-          }}
-        />
-      )}
       {timeline.map((other) => {
-        const current = other.id === focus?.event
+        const current = other.id === focus
         const mark =
           other.kind === 'period_ended'
             ? 'h-full w-0.5 bg-slate-400'
@@ -58,32 +47,42 @@ export function MiniTimeline({
   )
 }
 
-export function RelatedList({
-  related,
-  empty,
+function reveal(row: HTMLElement | null) {
+  row?.scrollIntoView({ block: 'nearest' })
+}
+
+export function EventList({
+  events,
+  focus,
   game,
   onSelect,
 }: {
-  related: readonly GameEvent[]
-  empty: string
+  events: readonly GameEvent[]
+  focus: EventId | null
   game: Game
   onSelect: (id: EventId) => void
 }) {
-  if (related.length === 0) return <p className="text-sm text-slate-500">{empty}</p>
+  if (events.length === 0)
+    return <p className="text-sm text-slate-500">No events in this game yet</p>
   return (
-    <ul className="flex max-h-[40vh] flex-col gap-1 overflow-y-auto">
-      {related.map((event) => (
-        <li key={event.id}>
-          <button
-            type="button"
-            onClick={() => onSelect(event.id)}
-            className={`flex w-full cursor-pointer items-center gap-3 rounded border-l-4 px-3 py-2 text-left text-sm hover:brightness-95 ${SEVERITY_STYLE[event.severity]}`}
-          >
-            <time className="text-xs text-slate-400 tabular-nums">{eventTime(event)}</time>
-            <span className="min-w-0 truncate">{describeEvent(event, game)}</span>
-          </button>
-        </li>
-      ))}
+    <ul className="flex max-h-[40vh] flex-col gap-1 overflow-y-auto p-0.5">
+      {events.map((event) => {
+        const current = event.id === focus
+        return (
+          <li key={event.id}>
+            <button
+              ref={current ? reveal : undefined}
+              type="button"
+              aria-current={current || undefined}
+              onClick={() => onSelect(event.id)}
+              className={`flex w-full cursor-pointer items-center gap-3 rounded border-l-4 px-3 py-2 text-left text-sm ${SEVERITY_STYLE[event.severity]} ${current ? SELECTED_STYLE : 'hover:brightness-95'}`}
+            >
+              <time className="text-xs text-slate-400 tabular-nums">{eventTime(event)}</time>
+              <span className="min-w-0 truncate">{describeEvent(event, game)}</span>
+            </button>
+          </li>
+        )
+      })}
     </ul>
   )
 }
@@ -112,7 +111,7 @@ export function DetailPanel({
   return (
     <aside
       aria-label={label}
-      className="flex flex-col gap-4 rounded-lg border border-slate-200 bg-white p-4 shadow-sm lg:sticky lg:top-6"
+      className={`flex flex-col gap-4 rounded-lg border border-slate-200 bg-white p-4 shadow-sm lg:sticky lg:top-6 ${SELECTED_ACCENT}`}
     >
       <div className="flex items-start justify-between gap-3">
         {heading}

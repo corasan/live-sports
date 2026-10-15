@@ -1,9 +1,9 @@
 import type { FeedQuery } from '#/feed/query'
-import { selectionSearch, type RelatedScope, type Selection } from '#/feed/selection'
+import type { Selection } from '#/feed/selection'
 import { useSimulation } from '#/sim/useSimulation'
 import { FilteredBoard } from './FilteredBoard'
+import { GameDetailPanel } from './GameDetailPanel'
 import { OutageControls } from './OutageControls'
-import { SelectionPanel } from './SelectionPanel'
 import { StatusBanner } from './StatusBanner'
 import { StressControls } from './StressControls'
 import { BUTTON } from './styles'
@@ -12,12 +12,10 @@ export function LiveBoard({
   seed,
   query,
   selection,
-  related,
 }: {
   seed: number
   query: FeedQuery
   selection: Selection | undefined
-  related: RelatedScope
 }) {
   const { store, paused, togglePaused, rate, setRate, outage, startOutage, endOutage } =
     useSimulation(seed)
@@ -38,11 +36,9 @@ export function LiveBoard({
       <FilteredBoard
         store={store}
         query={query}
-        selected={selectionSearch(selection)}
+        selection={selection}
         panel={
-          selection === undefined ? null : (
-            <SelectionPanel store={store} selection={selection} related={related} />
-          )
+          selection === undefined ? null : <GameDetailPanel store={store} selection={selection} />
         }
       />
     </main>

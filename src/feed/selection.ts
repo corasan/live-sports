@@ -1,11 +1,5 @@
 import { parseEventId, parseGameId, type EventId, type GameId } from '#/domain/ids'
 
-export const RELATED_SCOPES = ['game', 'drive'] as const
-
-export type RelatedScope = (typeof RELATED_SCOPES)[number]
-
-export const DEFAULT_RELATED: RelatedScope = 'game'
-
 export type Selection =
   | { readonly kind: 'event'; readonly id: EventId }
   | { readonly kind: 'game'; readonly id: GameId }

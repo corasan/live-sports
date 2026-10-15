@@ -6,7 +6,6 @@ import {
   EVENT_GROUPINGS,
   GAME_SORT_OPTIONS,
   leagueSelection,
-  parseOption,
   pickedTeams,
   SEVERITIES,
   toggleLeague,
@@ -16,6 +15,7 @@ import {
   type GameSort,
 } from '#/feed/query'
 import { ROSTER, ROSTERS } from '#/domain/roster'
+import { Chevron, CONTROL, FIELD, ICON, Select } from './Select'
 import { useSearchPatch } from './useSearchPatch'
 
 const SEVERITY_LABEL: Readonly<Record<Severity, string>> = {
@@ -34,19 +34,6 @@ const GROUPING_LABEL: Readonly<Record<EventGrouping, string>> = {
   none: 'No grouping',
   game: 'Game',
   league: 'League',
-}
-
-const FIELD = 'flex flex-col gap-1.5 text-xs font-medium text-slate-500'
-const CONTROL =
-  'h-9 w-full rounded-md border border-slate-200 bg-slate-50 text-sm text-slate-900 transition-colors hover:border-slate-300 focus:border-sky-500 focus:bg-white focus:ring-3 focus:ring-sky-500/15 focus:outline-none'
-const ICON = 'pointer-events-none absolute top-1/2 size-4 -translate-y-1/2 text-slate-400'
-
-function Chevron() {
-  return (
-    <svg viewBox="0 0 16 16" fill="none" aria-hidden className={`${ICON} right-2.5`}>
-      <path d="m4 6 4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-    </svg>
-  )
 }
 
 const CHECKBOX = 'flex items-center gap-2 py-0.5 text-sm text-slate-900'
@@ -148,40 +135,6 @@ function TeamPicker({
   )
 }
 
-function Select<T extends string>({
-  label,
-  options,
-  labels,
-  value,
-  onChange,
-}: {
-  label: string
-  options: readonly T[]
-  labels: Readonly<Record<T, string>>
-  value: T
-  onChange: (value: T) => void
-}) {
-  return (
-    <label className={FIELD}>
-      {label}
-      <span className="relative">
-        <select
-          className={`${CONTROL} cursor-pointer appearance-none pr-8 pl-3`}
-          value={value}
-          onChange={(event) => onChange(parseOption(options, event.target.value, value))}
-        >
-          {options.map((option) => (
-            <option key={option} value={option}>
-              {labels[option]}
-            </option>
-          ))}
-        </select>
-        <Chevron />
-      </span>
-    </label>
-  )
-}
-
 export function FeedControls({
   query,
   text,
@@ -216,27 +169,33 @@ export function FeedControls({
         </span>
       </label>
       <TeamPicker teams={query.teams} onChange={(teams) => update({ teams })} />
-      <Select
-        label="Severity"
-        options={SEVERITIES}
-        labels={SEVERITY_LABEL}
-        value={query.severity}
-        onChange={(severity) => update({ severity })}
-      />
-      <Select
-        label="Sort games"
-        options={GAME_SORT_OPTIONS}
-        labels={SORT_LABEL}
-        value={query.sort}
-        onChange={(sort) => update({ sort })}
-      />
-      <Select
-        label="Group feed by"
-        options={EVENT_GROUPINGS}
-        labels={GROUPING_LABEL}
-        value={query.group}
-        onChange={(group) => update({ group })}
-      />
+      <label className={FIELD}>
+        Severity
+        <Select
+          options={SEVERITIES}
+          labels={SEVERITY_LABEL}
+          value={query.severity}
+          onChange={(severity) => update({ severity })}
+        />
+      </label>
+      <label className={FIELD}>
+        Sort games
+        <Select
+          options={GAME_SORT_OPTIONS}
+          labels={SORT_LABEL}
+          value={query.sort}
+          onChange={(sort) => update({ sort })}
+        />
+      </label>
+      <label className={FIELD}>
+        Group feed by
+        <Select
+          options={EVENT_GROUPINGS}
+          labels={GROUPING_LABEL}
+          value={query.group}
+          onChange={(group) => update({ group })}
+        />
+      </label>
     </div>
   )
 }
