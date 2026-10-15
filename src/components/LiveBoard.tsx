@@ -3,6 +3,7 @@ import { selectionSearch, type FeedQuery, type RelatedScope, type Selection } fr
 import { useSimulation } from '#/sim/useSimulation'
 import { EventDetailPanel } from './EventDetailPanel'
 import { EventFeed } from './EventFeed'
+import { FeedErrorBoundary } from './FeedErrorBoundary'
 import { FeedControls } from './FeedControls'
 import { GameDetailPanel } from './GameDetailPanel'
 import { OutageControls } from './OutageControls'
@@ -48,7 +49,9 @@ export function LiveBoard({
             : 'grid gap-6 lg:grid-cols-[minmax(0,1fr)_24rem] lg:items-start'
         }
       >
-        <EventFeed store={store} query={query} selected={selected.event} />
+        <FeedErrorBoundary>
+          <EventFeed store={store} query={query} selected={selected.event} />
+        </FeedErrorBoundary>
         {selection === undefined ? null : (
           <SelectionPanel store={store} selection={selection} related={related} />
         )}
