@@ -1,19 +1,23 @@
 import { describe, expect, it } from 'vitest'
 import type { GameEvent } from '#/domain/event'
 import type { Game } from '#/domain/game'
+import { eventId } from '#/domain/ids'
 import { createFeed, ingest, type Feed } from './feed'
 import { feedEvents, gamesOf, simulate, simulatedFeed } from './fixtures'
 import { size } from './ring'
 import {
   DEFAULT_QUERY,
   parseFeedQuery,
+  selectEventDetail,
   selectFeedRows,
   selectVisibleGames,
+  stepSelection,
   type FeedQuery,
   type FeedRow,
+  type RelatedScope,
 } from './view'
 
-const { feed } = simulatedFeed(7, 120, 20_000)
+const { feed, events: emitted } = simulatedFeed(7, 120, 20_000)
 
 const STATUS_ORDER = { live: 0, scheduled: 1, final: 2 }
 
@@ -127,5 +131,92 @@ describe('parseFeedQuery', () => {
     expect(
       parseFeedQuery({ league: 'NFL', severity: 'loud', q: 'hawks', sort: 'closest' }),
     ).toEqual({ league: 'NFL', severity: 'info', q: 'hawks', sort: 'closest', group: 'none' })
+  })
+})
+
+describe('selectEventDetail', () => {
+  const selected = emitted.find((event) => {
+    const peers = emitted.filter((other) => other.gameId === event.gameId)
+    const drive = peers.filter((other) => other.drive === event.drive)
+    return drive.length > 2 && peers.length > drive.length
+  })
+  if (selected === undefined) throw new Error('fixture has no multi-event drive')
+
+  const found = (scope: RelatedScope) => {
+    const detail = selectEventDetail(feed, selected.id, scope)
+    if (detail.kind !== 'found') throw new Error('expected the selected event to be found')
+    return detail
+  }
+
+  it('returns the event, its game, and the full chronological timeline of that game', () => {
+    const detail = found('game')
+    expect(detail.event).toBe(selected)
+    expect(detail.game).toBe(feed.games.get(selected.gameId))
+    expect(detail.timeline).toEqual(emitted.filter((event) => event.gameId === selected.gameId))
+    const stamps = detail.timeline.map((event) => event.ts)
+    expect(stamps).toEqual(stamps.toSorted((a, b) => a - b))
+  })
+
+  it('lists the rest of the game newest first for the game scope', () => {
+    const detail = found('game')
+    expect(detail.related).toEqual(
+      detail.timeline.toReversed().filter((event) => event.id !== selected.id),
+    )
+  })
+
+  it('narrows the drive scope to a strict subset sharing the game and drive', () => {
+    const drive = found('drive').related
+    const game = found('game').related
+    expect(drive.length).toBeGreaterThan(0)
+    expect(drive.length).toBeLessThan(game.length)
+    for (const event of drive) {
+      expect(event.gameId).toBe(selected.gameId)
+      expect(event.drive).toBe(selected.drive)
+    }
+    expect(game.filter((event) => drive.includes(event))).toEqual(drive)
+    expect(drive).not.toContain(selected)
+  })
+
+  it('reports missing for an unknown id and for an evicted event', () => {
+    expect(selectEventDetail(feed, eventId(999_999), 'game')).toEqual({ kind: 'missing' })
+    const small = simulatedFeed(7, 120, 50)
+    expect(selectEventDetail(small.feed, small.events[0].id, 'game')).toEqual({ kind: 'missing' })
+  })
+
+  it('returns the cached detail until an input changes', () => {
+    const first = selectEventDetail(feed, selected.id, 'drive')
+    expect(selectEventDetail(feed, selected.id, 'drive')).toBe(first)
+    expect(selectEventDetail(feed, selected.id, 'game')).not.toBe(first)
+  })
+})
+
+describe('stepSelection', () => {
+  const rows = selectFeedRows(feed, query({ group: 'game' }))
+  const ids = eventsOf(rows).map((event) => event.id)
+  const headers = rows.filter((row) => row.kind === 'group').map((row) => row.key)
+
+  it('starts at the first event row in either direction when nothing is selected', () => {
+    expect(rows[0].kind).toBe('group')
+    expect(stepSelection(rows, null, 1)).toBe(ids[0])
+    expect(stepSelection(rows, null, -1)).toBe(ids[0])
+    expect(stepSelection(rows, eventId(999_999), -1)).toBe(ids[0])
+  })
+
+  it('walks every event row in order, skipping group headers', () => {
+    const visited = [ids[0]]
+    for (let i = 1; i < ids.length; i++)
+      visited.push(stepSelection(rows, visited[i - 1], 1) ?? ids[0])
+    expect(visited).toEqual(ids)
+    expect(headers.length).toBeGreaterThan(1)
+  })
+
+  it('clamps at both ends instead of wrapping', () => {
+    expect(stepSelection(rows, ids[0], -1)).toBe(ids[0])
+    expect(stepSelection(rows, ids.at(-1) ?? null, 1)).toBe(ids.at(-1))
+  })
+
+  it('selects nothing when there are no event rows', () => {
+    expect(stepSelection([], null, 1)).toBeNull()
+    expect(stepSelection([{ kind: 'group', key: 'group:x', label: 'X' }], ids[0], -1)).toBeNull()
   })
 })

@@ -9,10 +9,12 @@ export const LEAGUE_FILTERS = ['all', ...LEAGUES] as const
 export const SEVERITIES = ['info', 'notable', 'critical'] as const satisfies readonly Severity[]
 export const GAME_SORT_OPTIONS = ['schedule', 'closest', 'league'] as const
 export const EVENT_GROUPINGS = ['none', 'game', 'league'] as const
+export const RELATED_SCOPES = ['game', 'drive'] as const
 
 export type LeagueFilter = (typeof LEAGUE_FILTERS)[number]
 export type GameSort = (typeof GAME_SORT_OPTIONS)[number]
 export type EventGrouping = (typeof EVENT_GROUPINGS)[number]
+export type RelatedScope = (typeof RELATED_SCOPES)[number]
 
 export type FeedQuery = {
   readonly league: LeagueFilter
@@ -29,6 +31,18 @@ export const DEFAULT_QUERY: FeedQuery = {
   sort: 'schedule',
   group: 'none',
 }
+
+export const DEFAULT_RELATED: RelatedScope = 'game'
+
+export type EventDetail =
+  | { readonly kind: 'missing' }
+  | {
+      readonly kind: 'found'
+      readonly event: GameEvent
+      readonly game: Game
+      readonly timeline: readonly GameEvent[]
+      readonly related: readonly GameEvent[]
+    }
 
 export type FeedRow =
   | { readonly kind: 'group'; readonly key: string; readonly label: string }
@@ -66,6 +80,14 @@ const GROUPINGS: Readonly<
   game: (game) => ({ key: game.id, label: matchupLabel(game) }),
   league: (game) => ({ key: game.league, label: game.league }),
 }
+
+const MISSING: EventDetail = { kind: 'missing' }
+
+const IN_SCOPE: Readonly<Record<RelatedScope, (selected: GameEvent, other: GameEvent) => boolean>> =
+  {
+    game: () => true,
+    drive: (selected, other) => other.drive === selected.drive,
+  }
 
 export function parseOption<T extends string>(
   options: readonly T[],
@@ -154,4 +176,45 @@ export function selectFeedRows(feed: Feed, query: FeedQuery): readonly FeedRow[]
     query.q,
     query.group,
   )
+}
+
+const eventDetail = memoizeLast(
+  (
+    events: ReadonlyMap<EventId, GameEvent>,
+    order: Ring<EventId>,
+    games: ReadonlyMap<GameId, Game>,
+    id: EventId,
+    scope: RelatedScope,
+  ): EventDetail => {
+    const event = events.get(id)
+    if (event === undefined) return MISSING
+    const newestFirst: GameEvent[] = []
+    for (let age = 0; age < size(order); age++) {
+      const other = eventAt({ events, order }, age)
+      if (other.gameId === event.gameId) newestFirst.push(other)
+    }
+    const inScope = IN_SCOPE[scope]
+    return {
+      kind: 'found',
+      event,
+      game: lookup(games, event.gameId),
+      timeline: newestFirst.toReversed(),
+      related: newestFirst.filter((other) => other.id !== event.id && inScope(event, other)),
+    }
+  },
+)
+
+export function selectEventDetail(feed: Feed, id: EventId, scope: RelatedScope): EventDetail {
+  return eventDetail(feed.events, feed.order, feed.games, id, scope)
+}
+
+export function stepSelection(
+  rows: readonly FeedRow[],
+  selected: EventId | null,
+  delta: 1 | -1,
+): EventId | null {
+  const ids = rows.flatMap((row) => (row.kind === 'event' ? [row.key] : []))
+  const index = selected === null ? -1 : ids.indexOf(selected)
+  if (index === -1) return ids.at(0) ?? null
+  return ids[Math.min(ids.length - 1, Math.max(0, index + delta))]
 }
