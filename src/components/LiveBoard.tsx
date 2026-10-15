@@ -1,12 +1,24 @@
 import { useStore } from 'zustand'
 import { size } from '#/feed/ring'
-import type { FeedQuery } from '#/feed/view'
+import type { EventId } from '#/domain/ids'
+import type { FeedQuery, RelatedScope } from '#/feed/view'
 import { useSimulation } from '#/sim/useSimulation'
+import { EventDetailPanel } from './EventDetailPanel'
 import { EventFeed } from './EventFeed'
 import { FeedControls } from './FeedControls'
 import { Scoreboard } from './Scoreboard'
 
-export function LiveBoard({ seed, query }: { seed: number; query: FeedQuery }) {
+export function LiveBoard({
+  seed,
+  query,
+  selected,
+  related,
+}: {
+  seed: number
+  query: FeedQuery
+  selected: EventId | null
+  related: RelatedScope
+}) {
   const { store, paused, togglePaused } = useSimulation(seed)
   const waiting = useStore(store, (feed) => size(feed.order) === 0)
   return (
@@ -26,14 +38,25 @@ export function LiveBoard({ seed, query }: { seed: number; query: FeedQuery }) {
       </header>
       <FeedControls query={query} />
       <Scoreboard store={store} query={query} />
-      <section className="flex flex-col gap-2">
-        <h2 className="text-lg font-semibold">Feed</h2>
-        {waiting ? (
-          <p className="text-sm text-slate-500">Waiting for tip-off…</p>
-        ) : (
-          <EventFeed store={store} query={query} />
+      <div
+        className={
+          selected === null
+            ? undefined
+            : 'grid gap-6 lg:grid-cols-[minmax(0,1fr)_24rem] lg:items-start'
+        }
+      >
+        <section className="flex min-w-0 flex-col gap-2">
+          <h2 className="text-lg font-semibold">Feed</h2>
+          {waiting ? (
+            <p className="text-sm text-slate-500">Waiting for tip-off…</p>
+          ) : (
+            <EventFeed store={store} query={query} selected={selected} />
+          )}
+        </section>
+        {selected === null ? null : (
+          <EventDetailPanel store={store} selected={selected} related={related} />
         )}
-      </section>
+      </div>
     </main>
   )
 }

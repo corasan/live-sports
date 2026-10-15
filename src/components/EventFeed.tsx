@@ -1,52 +1,35 @@
 import { useVirtualizer } from '@tanstack/react-virtual'
-import { memo, useCallback, useLayoutEffect, useRef } from 'react'
+import { memo, useCallback, useEffect, useEffectEvent, useLayoutEffect, useRef } from 'react'
 import { useStore } from 'zustand'
-import type { GameEvent, Market, Severity } from '#/domain/event'
-import { matchupLabel, type Game } from '#/domain/game'
-import type { TeamId } from '#/domain/ids'
+import type { GameEvent } from '#/domain/event'
+import { matchupLabel } from '#/domain/game'
+import type { EventId } from '#/domain/ids'
 import type { FeedStore } from '#/feed/store'
-import { selectFeedRows, type FeedQuery, type FeedRow } from '#/feed/view'
-import { PERIOD_PREFIX } from './Scoreboard'
+import { selectFeedRows, stepSelection, type FeedQuery, type FeedRow } from '#/feed/view'
+import { describeEvent, eventTime, SEVERITY_STYLE, type Matchup } from './describeEvent'
+import { useSelection } from './useSelection'
 
 const ROW_HEIGHT = 44
 
 const OVERSCAN = 12
 
-type Matchup = Pick<Game, 'league' | 'home' | 'away'>
+const SELECTED_STYLE = 'ring-2 ring-sky-500 ring-inset'
 
-const SEVERITY_STYLE: Readonly<Record<Severity, string>> = {
-  info: 'border-slate-200 text-slate-600',
-  notable: 'border-amber-400 bg-amber-50 text-slate-900',
-  critical: 'border-red-500 bg-red-50 font-semibold text-red-900',
+const KEY_STEP: ReadonlyMap<string, 1 | -1> = new Map([
+  ['ArrowDown', 1],
+  ['ArrowUp', -1],
+])
+
+const EDITABLE_TAGS: ReadonlySet<string> = new Set(['INPUT', 'SELECT', 'TEXTAREA'])
+
+function isTyping(target: EventTarget | null): boolean {
+  return (
+    target instanceof HTMLElement && (target.isContentEditable || EDITABLE_TAGS.has(target.tagName))
+  )
 }
 
-const MARKET_LABEL: Readonly<Record<Market, string>> = {
-  moneyline: 'Home win %',
-  spread: 'Spread',
-  total: 'Total',
-}
-
-function teamName(matchup: Matchup, id: TeamId): string {
-  return id === matchup.home.id ? matchup.home.name : matchup.away.name
-}
-
-function describeEvent(event: GameEvent, matchup: Matchup): string {
-  switch (event.kind) {
-    case 'game_started':
-      return 'Game started'
-    case 'score':
-      return `${teamName(matchup, event.teamId)} +${event.points} (${event.score.away}-${event.score.home})`
-    case 'lead_change':
-      return `${teamName(matchup, event.leader)} take the lead`
-    case 'period_ended':
-      return `End of ${PERIOD_PREFIX[matchup.league]}${event.period}`
-    case 'injury':
-      return `${event.player} (${teamName(matchup, event.teamId)}) injured`
-    case 'odds_shift':
-      return `${MARKET_LABEL[event.market]} ${event.from} → ${event.to}`
-    case 'game_ended':
-      return `Final ${event.score.away}-${event.score.home}`
-  }
+function hasModifier(event: KeyboardEvent): boolean {
+  return event.altKey || event.ctrlKey || event.metaKey || event.shiftKey
 }
 
 const EventRow = memo(function EventRow({
@@ -54,32 +37,61 @@ const EventRow = memo(function EventRow({
   league,
   home,
   away,
-}: { event: GameEvent } & Matchup) {
+  selected,
+  onSelect,
+}: { event: GameEvent; selected: boolean; onSelect: (id: EventId) => void } & Matchup) {
   return (
-    <div
-      className={`flex h-full items-center gap-3 rounded border-l-4 px-3 text-sm whitespace-nowrap ${SEVERITY_STYLE[event.severity]}`}
+    <button
+      type="button"
+      aria-current={selected || undefined}
+      onClick={() => onSelect(event.id)}
+      className={`flex h-full w-full cursor-pointer items-center gap-3 rounded border-l-4 px-3 text-left text-sm whitespace-nowrap ${SEVERITY_STYLE[event.severity]} ${selected ? SELECTED_STYLE : 'hover:brightness-95'}`}
     >
-      <time className="text-xs text-slate-400 tabular-nums">
-        {new Date(event.ts).toLocaleTimeString()}
-      </time>
+      <time className="text-xs text-slate-400 tabular-nums">{eventTime(event)}</time>
       <span className="text-xs text-slate-500">{matchupLabel({ home, away })}</span>
       <span className="min-w-0 truncate">{describeEvent(event, { league, home, away })}</span>
-    </div>
+    </button>
   )
 })
 
-function FeedRowView({ row }: { row: FeedRow }) {
+function FeedRowView({
+  row,
+  selected,
+  onSelect,
+}: {
+  row: FeedRow
+  selected: EventId | null
+  onSelect: (id: EventId) => void
+}) {
   if (row.kind === 'event') {
     const { league, home, away } = row.game
-    return <EventRow event={row.event} league={league} home={home} away={away} />
+    return (
+      <EventRow
+        event={row.event}
+        league={league}
+        home={home}
+        away={away}
+        selected={row.key === selected}
+        onSelect={onSelect}
+      />
+    )
   }
   return (
     <h3 className="flex h-full items-end pb-1 text-sm font-semibold text-slate-700">{row.label}</h3>
   )
 }
 
-export function EventFeed({ store, query }: { store: FeedStore; query: FeedQuery }) {
+export function EventFeed({
+  store,
+  query,
+  selected,
+}: {
+  store: FeedStore
+  query: FeedQuery
+  selected: EventId | null
+}) {
   const rows = useStore(store, (feed) => selectFeedRows(feed, query))
+  const { select, close } = useSelection()
   const scrollRef = useRef<HTMLDivElement>(null)
   const getItemKey = useCallback((index: number) => rows[index].key, [rows])
   const virtualizer = useVirtualizer({
@@ -105,6 +117,29 @@ export function EventFeed({ store, query }: { store: FeedStore; query: FeedQuery
     }
   }, [rows, virtualizer])
 
+  const onKeyDown = useEffectEvent((event: KeyboardEvent) => {
+    if (hasModifier(event) || isTyping(event.target)) return
+    const delta = KEY_STEP.get(event.key)
+    if (delta !== undefined) {
+      const next = stepSelection(rows, selected, delta)
+      if (next === null) return
+      event.preventDefault()
+      select(next)
+      virtualizer.scrollToIndex(
+        rows.findIndex((row) => row.key === next),
+        { align: 'auto' },
+      )
+    } else if (event.key === 'Escape' && selected !== null) {
+      event.preventDefault()
+      close()
+    }
+  })
+
+  useEffect(() => {
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [])
+
   if (rows.length === 0) return <p className="text-sm text-slate-500">No matching events</p>
   return (
     <div ref={scrollRef} className="h-[60vh] overflow-y-auto">
@@ -115,7 +150,7 @@ export function EventFeed({ store, query }: { store: FeedStore; query: FeedQuery
             className="absolute inset-x-0 top-0 pb-2"
             style={{ height: ROW_HEIGHT, transform: `translateY(${item.start}px)` }}
           >
-            <FeedRowView row={rows[item.index]} />
+            <FeedRowView row={rows[item.index]} selected={selected} onSelect={select} />
           </li>
         ))}
       </ol>
