@@ -73,7 +73,7 @@ const EventRow = memo(function EventRow({
       type="button"
       aria-current={selected || undefined}
       onClick={() => onSelect(event.id)}
-      className={`flex h-full w-full cursor-pointer items-center gap-3 rounded border-l-4 px-3 text-left text-sm whitespace-nowrap ${SEVERITY_STYLE[event.severity]} ${selected ? SELECTED_STYLE : 'hover:brightness-95'} ${arrived ? 'animate-arrive' : ''}`}
+      className={`flex h-full w-full cursor-pointer items-center gap-3 rounded px-3 text-left text-sm whitespace-nowrap ${SEVERITY_STYLE[event.severity]} ${selected ? SELECTED_STYLE : 'hover:brightness-95'} ${arrived ? 'animate-arrive' : ''}`}
     >
       <time className="text-xs text-slate-400 tabular-nums">{eventTime(event)}</time>
       <span className="text-xs text-slate-500">{matchupLabel({ home, away })}</span>
@@ -156,7 +156,7 @@ function FeedSkeleton() {
     <ol aria-busy="true" aria-label="Loading events" className="h-[60vh] overflow-y-auto">
       {Array.from({ length: SKELETON_ROWS }, (_, index) => (
         <li key={index} className="pb-2" style={{ height: ROW_HEIGHT }}>
-          <div className="flex h-full animate-pulse items-center gap-3 rounded border-l-4 border-slate-200 px-3">
+          <div className="flex h-full animate-pulse items-center gap-3 rounded bg-slate-100 px-3">
             <div className="h-3 w-16 rounded bg-slate-200" />
             <div className="h-3 w-28 rounded bg-slate-200" />
             <div className="h-3 w-48 rounded bg-slate-200" />
