@@ -1,4 +1,5 @@
-import { PERIOD_PREFIX, type Game } from '#/domain/game'
+import type { Market } from '#/domain/event'
+import { PERIOD_PREFIX, type Game, type League } from '#/domain/game'
 
 function statusLabel(game: Game): string {
   switch (game.status) {
@@ -26,10 +27,47 @@ function signed(value: number): string {
   return value > 0 ? `+${value}` : `${value}`
 }
 
-export function oddsCells(game: Game): readonly (readonly [label: string, value: string])[] {
-  return [
-    ['Home win', `${game.odds.moneyline}%`],
-    ['Spread', signed(game.odds.spread)],
-    ['O/U', `${game.odds.total}`],
-  ]
+const SCORE_UNIT: Readonly<Record<League, { readonly one: string; readonly many: string }>> = {
+  NBA: { one: 'point', many: 'points' },
+  NFL: { one: 'point', many: 'points' },
+  NHL: { one: 'goal', many: 'goals' },
+}
+
+function unit(game: Game, amount: number): string {
+  const { one, many } = SCORE_UNIT[game.league]
+  return amount === 1 ? one : many
+}
+
+function spreadHint(game: Game): string {
+  const { home, away } = game
+  const line = game.odds.spread
+  const margin = Math.abs(line)
+  if (line < 0) return `${home.name} favored to win by ${margin} ${unit(game, margin)}.`
+  if (line > 0)
+    return `${home.name} are ${margin}-${unit(game, 1)} underdogs; ${away.name} favored by ${margin}.`
+  return `Pick'em: neither team is favored.`
+}
+
+export type OddsCell = { readonly label: string; readonly value: string; readonly hint: string }
+
+const ODDS_CELLS: Readonly<Record<Market, (game: Game) => OddsCell>> = {
+  moneyline: (game) => ({
+    label: 'Home win',
+    value: `${game.odds.moneyline}%`,
+    hint: `Betting markets give ${game.home.name} a ${game.odds.moneyline}% chance to win.`,
+  }),
+  spread: (game) => ({
+    label: 'Spread',
+    value: signed(game.odds.spread),
+    hint: spreadHint(game),
+  }),
+  total: (game) => ({
+    label: 'O/U',
+    value: `${game.odds.total}`,
+    hint: `Over/under: the expected combined score is ${game.odds.total} ${unit(game, game.odds.total)}.`,
+  }),
+}
+
+export function oddsCells(game: Game): readonly OddsCell[] {
+  return Object.values(ODDS_CELLS).map((cell) => cell(game))
 }

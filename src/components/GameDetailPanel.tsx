@@ -1,3 +1,4 @@
+import { useId } from 'react'
 import { useStore } from 'zustand'
 import { matchupLabel } from '#/domain/game'
 import type { EventId } from '#/domain/ids'
@@ -6,6 +7,7 @@ import type { FeedStore } from '#/feed/store'
 import { selectDetail } from '#/feed/selectors'
 import { DetailPanel, EventList, MiniTimeline } from './DetailPanel'
 import { GameStatus, oddsCells } from './gameLabels'
+import { columnAlign, Term } from './Term'
 import { useSelect } from './useSearchPatch'
 
 const MISSING: Readonly<Record<Selection['kind'], string>> = {
@@ -17,6 +19,7 @@ export function GameDetailPanel({ store, selection }: { store: FeedStore; select
   const detail = useStore(store, (feed) => selectDetail(feed, selection))
   const choose = useSelect()
   const select = (id: EventId) => choose({ kind: 'event', id })
+  const hints = useId()
 
   if (detail.kind === 'missing')
     return (
@@ -27,6 +30,7 @@ export function GameDetailPanel({ store, selection }: { store: FeedStore; select
     )
 
   const { game, timeline, recent, focus } = detail
+  const cells = oddsCells(game)
   return (
     <DetailPanel
       label="Game details"
@@ -46,9 +50,17 @@ export function GameDetailPanel({ store, selection }: { store: FeedStore; select
         <dd className="text-right text-3xl font-bold tabular-nums">{game.score.home}</dd>
       </dl>
       <dl className="grid grid-cols-3 gap-x-2 rounded border border-slate-200 p-2 text-xs">
-        {oddsCells(game).map(([label, value]) => (
+        {cells.map(({ label, value, hint }, index) => (
           <div key={label} className="min-w-0">
-            <dt className="truncate text-slate-500">{label}</dt>
+            <dt className="text-slate-500">
+              <Term
+                id={`${hints}-${index}`}
+                label={label}
+                hint={hint}
+                align={columnAlign(index, cells.length)}
+                focusable
+              />
+            </dt>
             <dd className="truncate text-sm font-semibold text-slate-800 tabular-nums">{value}</dd>
           </div>
         ))}
