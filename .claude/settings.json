@@ -1,0 +1,28 @@
+{
+  "enabledPlugins": {
+    "pstack@pstack-claude": true
+  },
+  "extraKnownMarketplaces": {
+    "pstack-claude": {
+      "source": {
+        "source": "github",
+        "repo": "michael-denyer/pstack-claude"
+      }
+    }
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/tools/claude-post-edit.sh",
+            "timeout": 120,
+            "statusMessage": "Formatting, linting, typechecking"
+          }
+        ]
+      }
+    ]
+  }
+}
