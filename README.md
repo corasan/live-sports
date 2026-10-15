@@ -4,7 +4,7 @@ A live sports scoreboard and event feed built with TanStack Start. All data come
 
 ## Run it
 
-Requires Node 22+ and using [Bun](https://bun.sh) 1.4+
+Requires Node 22+. I used [Bun](https://bun.sh) 1.4 as package manager but not required.
 
 ```bash
 bun install && bun dev
@@ -41,17 +41,17 @@ Open http://localhost:3000. Add `?seed=<number>` to replay a specific simulation
 
 These are some of the decisions/notes I used to write my prompts:
 
-- I chose Tanstack Start because of familiarity and the benefit of having fully typed routing and validated search params
-- the event model os a discriminated union, each event type carries its own data. An injury type, for example, dont have points
+- I chose TanStack Start because of familiarity and the benefit of having fully typed routing and validated search params
+- the event model is a discriminated union, each event type carries its own data. An injury type, for example, dont have points
   - batch events to apply changes in a single update, less renders per second
 - Games should only change through a reducer like function, nothing in the app should change the state of a game directly.
   - The scoreboard state is derived from the events so the events and scoreboard cant differ
 - A zustand store per seed for the feed. Filters and selection live in the URL. What’s on the UI is computed from both with memoized selectors
-- The simulator is driven by a requestAnimationFrame loop that pushes events
+- The simulator is driven by a `requestAnimationFrame` loop that pushes events
   - Pausing the simulation simply stops the rAF loop
   - Rate slider changes the rate at which the rAF pushes the events
-- Pausing or scroll away behavior: save the state into a local snapshot and render that state instead of the live store while the live store keeps receiving events
-- Virtualize lists with Tanstack Virtual, fixed row height
+- Pausing the feed and scroll away behavior: save the state into a local snapshot and render that state instead of the live store while the live store keeps receiving events
+- Virtualize lists with TanStack Virtual, fixed row height
 - Cap events at 20k
   - downside: since the cap is at 20k, events past that number will no longer be available because it gets removed from memory. Keeps the same memory usage.
   - Ring array to keep a fixed size, overwrite oldest no matter how big the buffer is
@@ -60,8 +60,7 @@ These are some of the decisions/notes I used to write my prompts:
 
 - 20k cap drops older events so we can't load older events on demand. We would use persistent data structures and be less wasteful in a real application.
 - Everything runs on the main thread
-- the 20k cap and the 350ms buffer is not measured, these numbers would be tuned with real profiling
-- 
+- the 20k cap and the 350ms buffer are not measured, these numbers would be tuned with real profiling.
 
 ## AI & Tools
 - I added the pstack plugin to the repo because I wanted to work as close as possible to how I would approach real work, I start my prompts with `/poteto-mode`. Pstack was overkill and the agent didn't really use the whole skillset because of how small the repo is so there was no real benefit, just showing how I use AI tools a bit more.
