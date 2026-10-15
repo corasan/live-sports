@@ -10,6 +10,7 @@ export type Feed = {
   readonly gameIds: readonly GameId[]
   readonly events: ReadonlyMap<EventId, GameEvent>
   readonly order: Ring<EventId>
+  readonly syncedAt: number | null
 }
 
 export function createFeed(games: readonly Game[], capacity = FEED_CAPACITY): Feed {
@@ -18,11 +19,12 @@ export function createFeed(games: readonly Game[], capacity = FEED_CAPACITY): Fe
     gameIds: games.map((game) => game.id),
     events: new Map(),
     order: createRing(capacity),
+    syncedAt: null,
   }
 }
 
-export function ingest(feed: Feed, batch: readonly GameEvent[]): Feed {
-  if (batch.length === 0) return feed
+export function ingest(feed: Feed, batch: readonly GameEvent[], syncedAt: number): Feed {
+  if (batch.length === 0) return { ...feed, syncedAt }
   const games = new Map(feed.games)
   const events = new Map(feed.events)
   for (const event of batch) {
@@ -34,7 +36,7 @@ export function ingest(feed: Feed, batch: readonly GameEvent[]): Feed {
     batch.map((event) => event.id),
   )
   for (const id of evicted) events.delete(id)
-  return { games, gameIds: feed.gameIds, events, order: ring }
+  return { games, gameIds: feed.gameIds, events, order: ring, syncedAt }
 }
 
 export function eventAt(feed: Pick<Feed, 'events' | 'order'>, index: number): GameEvent {

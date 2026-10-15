@@ -1,15 +1,24 @@
 import { useVirtualizer } from '@tanstack/react-virtual'
-import { memo, useCallback, useEffect, useEffectEvent, useRef, useState } from 'react'
+import {
+  memo,
+  useCallback,
+  useEffect,
+  useEffectEvent,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react'
 import { useStore } from 'zustand'
 import type { GameEvent } from '#/domain/event'
 import { matchupLabel } from '#/domain/game'
 import type { EventId } from '#/domain/ids'
 import type { Feed } from '#/feed/feed'
-import { size } from '#/feed/ring'
 import type { FeedStore } from '#/feed/store'
 import {
+  clearFilters,
   countNewEvents,
-  selectFeedRows,
+  selectFeedView,
+  selectHeldView,
   stepSelection,
   type FeedQuery,
   type FeedRow,
@@ -24,6 +33,10 @@ const ROW_HEIGHT = 44
 const OVERSCAN = 12
 
 const SCROLL_THRESHOLD = 1
+
+const SKELETON_ROWS = 8
+
+const NO_ROWS: readonly FeedRow[] = []
 
 const SELECTED_STYLE = 'ring-2 ring-sky-500 ring-inset'
 
@@ -81,6 +94,42 @@ function FeedRowView({
   )
 }
 
+function FeedSkeleton() {
+  return (
+    <ol aria-busy="true" aria-label="Loading events" className="h-[60vh] overflow-y-auto">
+      {Array.from({ length: SKELETON_ROWS }, (_, index) => (
+        <li key={index} className="pb-2" style={{ height: ROW_HEIGHT }}>
+          <div className="flex h-full animate-pulse items-center gap-3 rounded border-l-4 border-slate-200 px-3">
+            <div className="h-3 w-16 rounded bg-slate-200" />
+            <div className="h-3 w-28 rounded bg-slate-200" />
+            <div className="h-3 w-48 rounded bg-slate-200" />
+          </div>
+        </li>
+      ))}
+    </ol>
+  )
+}
+
+function FeedMessage({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <div className="flex flex-col items-start gap-1 py-6 text-sm">
+      <p className="font-medium text-slate-700">{title}</p>
+      {children}
+    </div>
+  )
+}
+
+function NoMatches({ query }: { query: FeedQuery }) {
+  const patch = useSearchPatch()
+  return (
+    <FeedMessage title="No events match these filters">
+      <button type="button" onClick={() => patch(clearFilters(query))} className={BUTTON}>
+        Clear filters
+      </button>
+    </FeedMessage>
+  )
+}
+
 function newEventsLabel(count: number): string {
   return count === 1 ? '1 new event' : `${count} new events`
 }
@@ -124,8 +173,10 @@ export function EventFeed({
   const held = paused || scrolledAway
   if (held && snapshot === null) setSnapshot(store.getState())
   if (!held && snapshot !== null) setSnapshot(null)
-  const waiting = useStore(store, (feed) => size(feed.order) === 0)
-  const rows = useStore(store, (feed) => selectFeedRows(snapshot ?? feed, query))
+  const view = useStore(store, (feed) =>
+    snapshot === null ? selectFeedView(feed, query) : selectHeldView(snapshot, query),
+  )
+  const rows = view.kind === 'rows' ? view.rows : NO_ROWS
   const patch = useSearchPatch()
   const select = useCallback((event: EventId) => patch({ event }), [patch])
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -170,17 +221,21 @@ export function EventFeed({
           {paused ? 'Resume feed' : 'Pause feed'}
         </button>
       </div>
-      {waiting ? (
-        <p className="text-sm text-slate-500">Waiting for tip-off…</p>
-      ) : (
-        <div className="relative">
+      <div className="relative">
+        {view.kind === 'loading' ? (
+          <FeedSkeleton />
+        ) : view.kind === 'empty' ? (
+          <FeedMessage title="No events yet">
+            <p className="text-slate-500">Events appear here once games tip off.</p>
+          </FeedMessage>
+        ) : (
           <div
             ref={scrollRef}
             onScroll={(event) => setScrolledAway(event.currentTarget.scrollTop > SCROLL_THRESHOLD)}
             className="h-[60vh] overflow-y-auto"
           >
-            {rows.length === 0 ? (
-              <p className="text-sm text-slate-500">No matching events</p>
+            {view.kind === 'no-matches' ? (
+              <NoMatches query={query} />
             ) : (
               <ol className="relative" style={{ height: virtualizer.getTotalSize() }}>
                 {virtualizer.getVirtualItems().map((item) => (
@@ -195,11 +250,11 @@ export function EventFeed({
               </ol>
             )}
           </div>
-          {snapshot !== null && (
-            <NewEventsPill store={store} snapshot={snapshot} query={query} onClick={jumpToLatest} />
-          )}
-        </div>
-      )}
+        )}
+        {snapshot !== null && (
+          <NewEventsPill store={store} snapshot={snapshot} query={query} onClick={jumpToLatest} />
+        )}
+      </div>
     </section>
   )
 }

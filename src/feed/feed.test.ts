@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { applyEvent } from '#/domain/game'
-import { createSimulation } from '#/sim/simulation'
-import { createFeed, ingest, type Feed } from './feed'
+import { ingest, type Feed } from './feed'
 import { feedEvents, gamesOf, simulatedFeed } from './fixtures'
 import { size } from './ring'
 
@@ -35,8 +34,13 @@ describe('ingest', () => {
     expect(feedEvents(feed)).toEqual(events.slice(-25).toReversed())
   })
 
-  it('returns the same feed for an empty batch', () => {
-    const feed = createFeed(createSimulation(3).games.map(({ game }) => game))
-    expect(ingest(feed, [])).toBe(feed)
+  it('treats an empty batch as a heartbeat that only advances syncedAt', () => {
+    const { feed } = simulatedFeed(3, 60, 20_000)
+    const synced = ingest(feed, [], 61_000)
+    expect(synced.syncedAt).toBe(61_000)
+    expect(synced.games).toBe(feed.games)
+    expect(synced.gameIds).toBe(feed.gameIds)
+    expect(synced.events).toBe(feed.events)
+    expect(synced.order).toBe(feed.order)
   })
 })

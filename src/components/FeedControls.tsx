@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react'
 import type { Severity } from '#/domain/event'
 import {
   EVENT_GROUPINGS,
@@ -75,11 +76,18 @@ function Select<T extends string>({
 
 export function FeedControls({ query }: { query: FeedQuery }) {
   const update = useSearchPatch()
+  const search = useRef<HTMLInputElement>(null)
+  useEffect(() => {
+    const input = search.current
+    if (input === null || input === document.activeElement || input.value === query.q) return
+    input.value = query.q
+  }, [query.q])
   return (
     <div className="flex flex-wrap items-end gap-3">
       <label className={FIELD}>
         Search teams
         <input
+          ref={search}
           type="search"
           className={INPUT}
           defaultValue={query.q}

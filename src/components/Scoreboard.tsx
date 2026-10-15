@@ -18,13 +18,43 @@ function signed(value: number): string {
   return value > 0 ? `+${value}` : `${value}`
 }
 
+const GRID = 'grid gap-3 sm:grid-cols-2 lg:grid-cols-4'
+const CARD = 'rounded-lg border border-slate-200 bg-white p-3 shadow-sm'
+const BONE = 'rounded bg-slate-200'
+
+function ScoreboardSkeleton({ store }: { store: FeedStore }) {
+  const count = useStore(store, (feed) => feed.gameIds.length)
+  return (
+    <ul aria-busy="true" aria-label="Loading games" className={GRID}>
+      {Array.from({ length: count }, (_, index) => (
+        <li key={index} className={`${CARD} animate-pulse`}>
+          <div className="flex h-4 items-center justify-between">
+            <div className={`h-3 w-8 ${BONE}`} />
+            <div className={`h-3 w-6 ${BONE}`} />
+          </div>
+          <div className="mt-2 flex flex-col gap-y-1">
+            <div className={`my-1 h-3 w-3/4 ${BONE}`} />
+            <div className={`my-1 h-3 w-2/3 ${BONE}`} />
+          </div>
+          <div className="mt-2 flex h-4 items-center">
+            <div className={`h-3 w-full ${BONE}`} />
+          </div>
+        </li>
+      ))}
+    </ul>
+  )
+}
+
 export function Scoreboard({ store, query }: { store: FeedStore; query: FeedQuery }) {
-  const games = useStore(store, (feed) => selectVisibleGames(feed, query))
+  const games = useStore(store, (feed) =>
+    feed.syncedAt === null ? null : selectVisibleGames(feed, query),
+  )
+  if (games === null) return <ScoreboardSkeleton store={store} />
   if (games.length === 0) return <p className="text-sm text-slate-500">No matching games</p>
   return (
-    <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+    <ul className={GRID}>
       {games.map((game) => (
-        <li key={game.id} className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+        <li key={game.id} className={CARD}>
           <div className="flex justify-between text-xs font-medium text-slate-500">
             <span>{game.league}</span>
             <span className={game.status === 'live' ? 'text-red-600' : undefined}>
