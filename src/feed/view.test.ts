@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import type { GameEvent } from '#/domain/event'
 import type { Game } from '#/domain/game'
-import { eventId } from '#/domain/ids'
+import { eventId, type EventId } from '#/domain/ids'
 import { createFeed, ingest, type Feed } from './feed'
 import { feedEvents, gamesOf, simulate, simulatedFeed } from './fixtures'
 import { size } from './ring'
 import {
+  countNewEvents,
   DEFAULT_QUERY,
   parseFeedQuery,
   selectEventDetail,
@@ -104,6 +105,45 @@ describe('selectFeedRows', () => {
     expect(ages.flat().toSorted((a, b) => a - b)).toEqual(
       Array.from({ length: size(feed.order) }, (_, i) => i),
     )
+  })
+})
+
+describe('countNewEvents', () => {
+  const { initial, batches } = simulate(7, 120)
+  const split = 30
+  const snapshot = batches.slice(0, split).reduce(ingest, createFeed(initial))
+  const live = batches.slice(split).reduce(ingest, snapshot)
+
+  function newVisibleIds(q: FeedQuery): EventId[] {
+    return eventsOf(selectFeedRows(live, q))
+      .filter((event) => !snapshot.events.has(event.id))
+      .map((event) => event.id)
+  }
+
+  it('counts only events ingested after the snapshot', () => {
+    const fresh = newVisibleIds(DEFAULT_QUERY)
+    expect(fresh.length).toBeGreaterThan(0)
+    expect(fresh.length).toBeLessThan(size(live.order))
+    expect(countNewEvents(live, snapshot, DEFAULT_QUERY)).toBe(fresh.length)
+    expect(countNewEvents(live, live, DEFAULT_QUERY)).toBe(0)
+  })
+
+  it.each([
+    ['severity', query({ severity: 'notable' })],
+    ['league', query({ league: 'NBA' })],
+  ])('respects the %s filter', (_, filtered) => {
+    const fresh = newVisibleIds(filtered)
+    expect(fresh.length).toBeGreaterThan(0)
+    expect(fresh.length).toBeLessThan(newVisibleIds(DEFAULT_QUERY).length)
+    expect(countNewEvents(live, snapshot, filtered)).toBe(fresh.length)
+  })
+
+  it('caps at the ring capacity when more new events were written than it holds', () => {
+    const capacity = 5
+    const small = batches.slice(0, split).reduce(ingest, createFeed(initial, capacity))
+    const overflowed = batches.slice(split).reduce(ingest, small)
+    expect(overflowed.order.written - small.order.written).toBeGreaterThan(capacity)
+    expect(countNewEvents(overflowed, small, DEFAULT_QUERY)).toBe(capacity)
   })
 })
 

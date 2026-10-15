@@ -137,6 +137,19 @@ export function selectVisibleGames(feed: Feed, query: FeedQuery): readonly Game[
   return visibleGames(feed.games, feed.gameIds, query.league, query.q, query.sort)
 }
 
+function eventMatcher(
+  games: ReadonlyMap<GameId, Game>,
+  gameIds: readonly GameId[],
+  league: LeagueFilter,
+  severity: Severity,
+  q: string,
+): (event: GameEvent) => boolean {
+  const matches = gameMatcher(league, q)
+  const visible = new Set(gameIds.filter((id) => matches(lookup(games, id))))
+  return (event) =>
+    SEVERITY_RANK[event.severity] >= SEVERITY_RANK[severity] && visible.has(event.gameId)
+}
+
 const feedRows = memoizeLast(
   (
     games: ReadonlyMap<GameId, Game>,
@@ -148,15 +161,12 @@ const feedRows = memoizeLast(
     q: string,
     group: EventGrouping,
   ): readonly FeedRow[] => {
-    const matches = gameMatcher(league, q)
-    const visible = new Set(gameIds.filter((id) => matches(lookup(games, id))))
+    const passes = eventMatcher(games, gameIds, league, severity, q)
     const groupOf = GROUPINGS[group]
     const groups = new Map<string, FeedRow[]>()
     for (let age = 0; age < size(order); age++) {
       const event = eventAt({ events, order }, age)
-      if (SEVERITY_RANK[event.severity] < SEVERITY_RANK[severity] || !visible.has(event.gameId)) {
-        continue
-      }
+      if (!passes(event)) continue
       const game = lookup(games, event.gameId)
       const { key, label } = groupOf(game)
       let rows = groups.get(key)
@@ -228,4 +238,26 @@ export function stepSelection(
   }
   const stay = rows.at(current)
   return current !== -1 && stay?.kind === 'event' ? { id: stay.key, index: current } : null
+}
+
+const newEventCount = memoizeLast(
+  (
+    feed: Feed,
+    snapshotWritten: number,
+    league: LeagueFilter,
+    severity: Severity,
+    q: string,
+  ): number => {
+    const passes = eventMatcher(feed.games, feed.gameIds, league, severity, q)
+    const fresh = Math.min(feed.order.written - snapshotWritten, size(feed.order))
+    let count = 0
+    for (let age = 0; age < fresh; age++) {
+      if (passes(eventAt(feed, age))) count++
+    }
+    return count
+  },
+)
+
+export function countNewEvents(live: Feed, snapshot: Feed, query: FeedQuery): number {
+  return newEventCount(live, snapshot.order.written, query.league, query.severity, query.q)
 }

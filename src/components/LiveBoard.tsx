@@ -1,11 +1,9 @@
-import { useStore } from 'zustand'
-import { size } from '#/feed/ring'
 import type { EventId } from '#/domain/ids'
 import type { FeedQuery, RelatedScope } from '#/feed/view'
 import { useSimulation } from '#/sim/useSimulation'
 import { EventDetailPanel } from './EventDetailPanel'
 import { EventFeed } from './EventFeed'
-import { FeedControls } from './FeedControls'
+import { BUTTON, FeedControls } from './FeedControls'
 import { Scoreboard } from './Scoreboard'
 
 export function LiveBoard({
@@ -20,19 +18,14 @@ export function LiveBoard({
   related: RelatedScope
 }) {
   const { store, paused, togglePaused } = useSimulation(seed)
-  const waiting = useStore(store, (feed) => size(feed.order) === 0)
   return (
     <main className="mx-auto flex max-w-6xl flex-col gap-6 p-6">
       <header className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Live games</h1>
         <div className="flex items-center gap-3 text-sm text-slate-500">
           <span>Seed {seed}</span>
-          <button
-            type="button"
-            onClick={togglePaused}
-            className="rounded border border-slate-300 px-3 py-1 font-medium text-slate-700 hover:bg-slate-100"
-          >
-            {paused ? 'Resume' : 'Pause'}
+          <button type="button" onClick={togglePaused} className={BUTTON}>
+            {paused ? 'Resume simulation' : 'Pause simulation'}
           </button>
         </div>
       </header>
@@ -45,14 +38,7 @@ export function LiveBoard({
             : 'grid gap-6 lg:grid-cols-[minmax(0,1fr)_24rem] lg:items-start'
         }
       >
-        <section className="flex min-w-0 flex-col gap-2">
-          <h2 className="text-lg font-semibold">Feed</h2>
-          {waiting ? (
-            <p className="text-sm text-slate-500">Waiting for tip-off…</p>
-          ) : (
-            <EventFeed store={store} query={query} selected={selected} />
-          )}
-        </section>
+        <EventFeed store={store} query={query} selected={selected} />
         {selected === undefined ? null : (
           <EventDetailPanel store={store} selected={selected} related={related} />
         )}
