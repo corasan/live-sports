@@ -5,9 +5,6 @@ import { eventAt, lookup, type Feed, type Gap } from './feed'
 import { memoizeLast } from './memo'
 import type { EventGrouping, FeedQuery, GameSort } from './query'
 import { at, size, type Ring } from './ring'
-import type { RelatedScope } from './selection'
-
-export type DriveSpan = { readonly start: number; readonly end: number }
 
 type Missing = { readonly kind: 'missing' }
 
@@ -18,7 +15,6 @@ export type EventDetail =
       readonly event: GameEvent
       readonly game: Game
       readonly timeline: readonly GameEvent[]
-      readonly driveSpan: DriveSpan
       readonly related: readonly GameEvent[]
     }
 
@@ -82,12 +78,6 @@ const GROUPINGS: Readonly<
 }
 
 const MISSING: Missing = { kind: 'missing' }
-
-const IN_SCOPE: Readonly<Record<RelatedScope, (selected: GameEvent, other: GameEvent) => boolean>> =
-  {
-    game: () => true,
-    drive: (selected, other) => other.drive === selected.drive,
-  }
 
 function gameMatcher(teams: readonly TeamId[], q: string): (game: Game) => boolean {
   const needle = q.trim().toLowerCase()
@@ -214,26 +204,22 @@ const eventDetail = memoizeLast(
     order: Ring<EventId>,
     games: ReadonlyMap<GameId, Game>,
     id: EventId,
-    scope: RelatedScope,
   ): EventDetail => {
     const event = events.get(id)
     if (event === undefined) return MISSING
     const newestFirst = gameEventsNewestFirst(events, order, event.gameId)
-    const inScope = IN_SCOPE[scope]
-    const drive = newestFirst.filter((other) => IN_SCOPE.drive(event, other))
     return {
       kind: 'found',
       event,
       game: lookup(games, event.gameId),
       timeline: newestFirst.toReversed(),
-      driveSpan: { start: (drive.at(-1) ?? event).ts, end: (drive.at(0) ?? event).ts },
-      related: newestFirst.filter((other) => other.id !== event.id && inScope(event, other)),
+      related: newestFirst.filter((other) => other.id !== event.id),
     }
   },
 )
 
-export function selectEventDetail(feed: Feed, id: EventId, scope: RelatedScope): EventDetail {
-  return eventDetail(feed.events, feed.order, feed.games, id, scope)
+export function selectEventDetail(feed: Feed, id: EventId): EventDetail {
+  return eventDetail(feed.events, feed.order, feed.games, id)
 }
 
 const gameDetail = memoizeLast(

@@ -101,18 +101,6 @@ describe.each(SEEDS)('a rolling slate with seed %i', (seed) => {
     }
   })
 
-  it('advances the drive exactly after each score and period_ended', () => {
-    for (const { events: stream } of streams.values()) {
-      if (stream.length === 0) continue
-      expect(stream[0].drive).toBe(0)
-      for (const [previous, next] of stream.slice(1).map((event, i) => [stream[i], event])) {
-        const closed = previous.kind === 'score' || previous.kind === 'period_ended'
-        expect(next.drive - previous.drive).toBe(closed ? 1 : 0)
-      }
-    }
-    expect(events.some((event) => event.drive > 0)).toBe(true)
-  })
-
   it('emits nothing for a game after its game_ended', () => {
     for (const { events: stream } of streams.values()) {
       const kinds = stream.map((event) => event.kind)

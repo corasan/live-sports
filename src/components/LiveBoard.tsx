@@ -1,5 +1,5 @@
 import type { FeedQuery } from '#/feed/query'
-import { selectionSearch, type RelatedScope, type Selection } from '#/feed/selection'
+import { selectionSearch, type Selection } from '#/feed/selection'
 import { useSimulation } from '#/sim/useSimulation'
 import { FilteredBoard } from './FilteredBoard'
 import { OutageControls } from './OutageControls'
@@ -12,12 +12,10 @@ export function LiveBoard({
   seed,
   query,
   selection,
-  related,
 }: {
   seed: number
   query: FeedQuery
   selection: Selection | undefined
-  related: RelatedScope
 }) {
   const { store, paused, togglePaused, rate, setRate, outage, startOutage, endOutage } =
     useSimulation(seed)
@@ -40,9 +38,7 @@ export function LiveBoard({
         query={query}
         selected={selectionSearch(selection)}
         panel={
-          selection === undefined ? null : (
-            <SelectionPanel store={store} selection={selection} related={related} />
-          )
+          selection === undefined ? null : <SelectionPanel store={store} selection={selection} />
         }
       />
     </main>

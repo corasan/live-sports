@@ -2,12 +2,9 @@ import { useEffect, type ReactNode } from 'react'
 import type { GameEvent } from '#/domain/event'
 import type { Game } from '#/domain/game'
 import type { EventId } from '#/domain/ids'
-import type { DriveSpan } from '#/feed/selectors'
 import { describeEvent, eventTime, SEVERITY_DOT, SEVERITY_STYLE } from './describeEvent'
 import { isPlainKeypress } from './keys'
 import { useSelect } from './useSearchPatch'
-
-type TimelineFocus = { readonly event: EventId; readonly driveSpan: DriveSpan }
 
 export function MiniTimeline({
   timeline,
@@ -16,7 +13,7 @@ export function MiniTimeline({
   onSelect,
 }: {
   timeline: readonly GameEvent[]
-  focus: TimelineFocus | null
+  focus: EventId | null
   game: Game
   onSelect: (id: EventId) => void
 }) {
@@ -27,17 +24,8 @@ export function MiniTimeline({
   return (
     <div className="relative h-8" role="group" aria-label="Game timeline">
       <div className="absolute inset-x-0 top-1/2 h-px bg-slate-200" />
-      {focus === null ? null : (
-        <div
-          className="absolute inset-y-1 min-w-1 -translate-x-0.5 rounded bg-sky-100"
-          style={{
-            left: `${offset(focus.driveSpan.start)}%`,
-            width: `${offset(focus.driveSpan.end) - offset(focus.driveSpan.start)}%`,
-          }}
-        />
-      )}
       {timeline.map((other) => {
-        const current = other.id === focus?.event
+        const current = other.id === focus
         const mark =
           other.kind === 'period_ended'
             ? 'h-full w-0.5 bg-slate-400'
