@@ -17,6 +17,7 @@ export function memoizeLast<A extends readonly unknown[], R>(
 }
 
 function sameArg<T>(a: T, b: T): boolean {
-  if (!Array.isArray(a) || !Array.isArray(b)) return Object.is(a, b)
+  if (Object.is(a, b)) return true
+  if (!Array.isArray(a) || !Array.isArray(b)) return false
   return a.length === b.length && a.every((item, index) => Object.is(item, b[index]))
 }
