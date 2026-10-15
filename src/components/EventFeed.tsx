@@ -1,16 +1,18 @@
 import { useVirtualizer } from '@tanstack/react-virtual'
-import { memo, useCallback, useLayoutEffect, useRef } from 'react'
+import { memo, useCallback, useRef, useState } from 'react'
 import { useStore } from 'zustand'
 import type { GameEvent, Market, Severity } from '#/domain/event'
 import { matchupLabel, type Game } from '#/domain/game'
 import type { TeamId } from '#/domain/ids'
 import type { FeedStore } from '#/feed/store'
-import { selectFeedRows, type FeedQuery, type FeedRow } from '#/feed/view'
+import { countNewEvents, selectFeedRows, type FeedQuery, type FeedRow } from '#/feed/view'
 import { PERIOD_PREFIX } from './Scoreboard'
 
 const ROW_HEIGHT = 44
 
 const OVERSCAN = 12
+
+const SCROLL_THRESHOLD = 1
 
 type Matchup = Pick<Game, 'league' | 'home' | 'away'>
 
@@ -78,8 +80,39 @@ function FeedRowView({ row }: { row: FeedRow }) {
   )
 }
 
-export function EventFeed({ store, query }: { store: FeedStore; query: FeedQuery }) {
-  const rows = useStore(store, (feed) => selectFeedRows(feed, query))
+function useHeld<T>(value: T, held: boolean): T | null {
+  const [snapshot, setSnapshot] = useState<T | null>(null)
+  if (held && snapshot === null) {
+    setSnapshot(value)
+    return value
+  }
+  if (!held && snapshot !== null) {
+    setSnapshot(null)
+    return null
+  }
+  return snapshot
+}
+
+function newEventsLabel(count: number): string {
+  return count === 1 ? '1 new event' : `${count} new events`
+}
+
+export function EventFeed({
+  store,
+  query,
+  paused,
+  onResume,
+}: {
+  store: FeedStore
+  query: FeedQuery
+  paused: boolean
+  onResume: () => void
+}) {
+  const live = useStore(store)
+  const [scrolledAway, setScrolledAway] = useState(false)
+  const snapshot = useHeld(live, paused || scrolledAway)
+  const rows = selectFeedRows(snapshot ?? live, query)
+  const newEvents = snapshot === null ? 0 : countNewEvents(live, snapshot, query)
   const scrollRef = useRef<HTMLDivElement>(null)
   const getItemKey = useCallback((index: number) => rows[index].key, [rows])
   const virtualizer = useVirtualizer({
@@ -90,35 +123,44 @@ export function EventFeed({ store, query }: { store: FeedStore; query: FeedQuery
     overscan: OVERSCAN,
   })
 
-  const previousRows = useRef(rows)
-  useLayoutEffect(() => {
-    const previous = previousRows.current
-    previousRows.current = rows
-    const scrollTop = scrollRef.current?.scrollTop ?? 0
-    if (previous === rows || scrollTop === 0) return
-    const top = Math.floor(scrollTop / ROW_HEIGHT)
-    const anchor = previous.at(top)
-    if (anchor === undefined) return
-    const index = rows.findIndex((row) => row.key === anchor.key)
-    if (index !== -1 && index !== top) {
-      virtualizer.scrollToOffset(scrollTop + (index - top) * ROW_HEIGHT)
-    }
-  }, [rows, virtualizer])
+  function jumpToLatest() {
+    scrollRef.current?.scrollTo({ top: 0, behavior: 'instant' })
+    setScrolledAway(false)
+    onResume()
+  }
 
-  if (rows.length === 0) return <p className="text-sm text-slate-500">No matching events</p>
   return (
-    <div ref={scrollRef} className="h-[60vh] overflow-y-auto">
-      <ol className="relative" style={{ height: virtualizer.getTotalSize() }}>
-        {virtualizer.getVirtualItems().map((item) => (
-          <li
-            key={item.key}
-            className="absolute inset-x-0 top-0 pb-2"
-            style={{ height: ROW_HEIGHT, transform: `translateY(${item.start}px)` }}
-          >
-            <FeedRowView row={rows[item.index]} />
-          </li>
-        ))}
-      </ol>
+    <div className="relative">
+      <div
+        ref={scrollRef}
+        onScroll={(event) => setScrolledAway(event.currentTarget.scrollTop > SCROLL_THRESHOLD)}
+        className="h-[60vh] overflow-y-auto"
+      >
+        {rows.length === 0 ? (
+          <p className="text-sm text-slate-500">No matching events</p>
+        ) : (
+          <ol className="relative" style={{ height: virtualizer.getTotalSize() }}>
+            {virtualizer.getVirtualItems().map((item) => (
+              <li
+                key={item.key}
+                className="absolute inset-x-0 top-0 pb-2"
+                style={{ height: ROW_HEIGHT, transform: `translateY(${item.start}px)` }}
+              >
+                <FeedRowView row={rows[item.index]} />
+              </li>
+            ))}
+          </ol>
+        )}
+      </div>
+      {newEvents > 0 && (
+        <button
+          type="button"
+          onClick={jumpToLatest}
+          className="absolute top-2 left-1/2 -translate-x-1/2 rounded-full bg-slate-900 px-3 py-1 text-xs font-medium text-white shadow-md hover:bg-slate-700"
+        >
+          {newEventsLabel(newEvents)}
+        </button>
+      )}
     </div>
   )
 }

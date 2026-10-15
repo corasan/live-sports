@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useStore } from 'zustand'
 import { size } from '#/feed/ring'
 import type { FeedQuery } from '#/feed/view'
@@ -9,6 +10,7 @@ import { Scoreboard } from './Scoreboard'
 export function LiveBoard({ seed, query }: { seed: number; query: FeedQuery }) {
   const { store, paused, togglePaused } = useSimulation(seed)
   const waiting = useStore(store, (feed) => size(feed.order) === 0)
+  const [feedPaused, setFeedPaused] = useState(false)
   return (
     <main className="mx-auto flex max-w-6xl flex-col gap-6 p-6">
       <header className="flex items-center justify-between">
@@ -20,18 +22,32 @@ export function LiveBoard({ seed, query }: { seed: number; query: FeedQuery }) {
             onClick={togglePaused}
             className="rounded border border-slate-300 px-3 py-1 font-medium text-slate-700 hover:bg-slate-100"
           >
-            {paused ? 'Resume' : 'Pause'}
+            {paused ? 'Resume simulation' : 'Pause simulation'}
           </button>
         </div>
       </header>
       <FeedControls query={query} />
       <Scoreboard store={store} query={query} />
       <section className="flex flex-col gap-2">
-        <h2 className="text-lg font-semibold">Feed</h2>
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold">Feed</h2>
+          <button
+            type="button"
+            onClick={() => setFeedPaused((value) => !value)}
+            className="rounded border border-slate-300 px-3 py-1 font-medium text-slate-700 hover:bg-slate-100 text-sm"
+          >
+            {feedPaused ? 'Resume feed' : 'Pause feed'}
+          </button>
+        </div>
         {waiting ? (
           <p className="text-sm text-slate-500">Waiting for tip-off…</p>
         ) : (
-          <EventFeed store={store} query={query} />
+          <EventFeed
+            store={store}
+            query={query}
+            paused={feedPaused}
+            onResume={() => setFeedPaused(false)}
+          />
         )}
       </section>
     </main>
