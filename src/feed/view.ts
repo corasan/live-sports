@@ -159,15 +159,11 @@ export function toggleLeague(teams: readonly TeamId[], league: League): readonly
     : normalizeTeams([...teams, ...ids])
 }
 
-function teamsKey(teams: readonly TeamId[]): string {
-  return teams.join(',')
-}
-
-function gameMatcher(teams: string, q: string): (game: Game) => boolean {
+function gameMatcher(teams: readonly TeamId[], q: string): (game: Game) => boolean {
   const needle = q.trim().toLowerCase()
-  const picked = new Set(teams.split(','))
+  const picked = new Set(teams)
   return (game) =>
-    (teams === '' || picked.has(game.home.id) || picked.has(game.away.id)) &&
+    (teams.length === 0 || picked.has(game.home.id) || picked.has(game.away.id)) &&
     [game.home.name, game.away.name].some((name) => name.toLowerCase().includes(needle))
 }
 
@@ -175,7 +171,7 @@ const visibleGames = memoizeLast(
   (
     games: ReadonlyMap<GameId, Game>,
     gameIds: readonly GameId[],
-    teams: string,
+    teams: readonly TeamId[],
     q: string,
     sort: GameSort,
   ): readonly Game[] => {
@@ -186,12 +182,12 @@ const visibleGames = memoizeLast(
 )
 
 export function selectVisibleGames(feed: Feed, query: FeedQuery): readonly Game[] {
-  return visibleGames(feed.games, feed.gameIds, teamsKey(query.teams), query.q, query.sort)
+  return visibleGames(feed.games, feed.gameIds, query.teams, query.q, query.sort)
 }
 
 function eventMatcher(
   games: ReadonlyMap<GameId, Game>,
-  teams: string,
+  teams: readonly TeamId[],
   severity: Severity,
   q: string,
 ): (event: GameEvent) => boolean {
@@ -206,7 +202,7 @@ const feedRows = memoizeLast(
     games: ReadonlyMap<GameId, Game>,
     events: ReadonlyMap<EventId, GameEvent>,
     order: Ring<EventId>,
-    teams: string,
+    teams: readonly TeamId[],
     severity: Severity,
     q: string,
     group: EventGrouping,
@@ -235,7 +231,7 @@ export function selectFeedRows(feed: Feed, query: FeedQuery): readonly FeedRow[]
     feed.games,
     feed.events,
     feed.order,
-    teamsKey(query.teams),
+    query.teams,
     query.severity,
     query.q,
     query.group,
@@ -334,7 +330,13 @@ export function stepSelection(
 }
 
 const newEventCount = memoizeLast(
-  (feed: Feed, snapshotWritten: number, teams: string, severity: Severity, q: string): number => {
+  (
+    feed: Feed,
+    snapshotWritten: number,
+    teams: readonly TeamId[],
+    severity: Severity,
+    q: string,
+  ): number => {
     const passes = eventMatcher(feed.games, teams, severity, q)
     const fresh = Math.min(feed.order.written - snapshotWritten, size(feed.order))
     let count = 0
@@ -346,7 +348,7 @@ const newEventCount = memoizeLast(
 )
 
 export function countNewEvents(live: Feed, snapshot: Feed, query: FeedQuery): number {
-  return newEventCount(live, snapshot.order.written, teamsKey(query.teams), query.severity, query.q)
+  return newEventCount(live, snapshot.order.written, query.teams, query.severity, query.q)
 }
 
 export type FeedView =
