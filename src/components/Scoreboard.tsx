@@ -2,7 +2,7 @@ import { useStore } from 'zustand'
 import type { GameId } from '#/domain/ids'
 import type { FeedStore } from '#/feed/store'
 import { selectVisibleGames, type FeedQuery } from '#/feed/view'
-import { oddsCells, statusLabel } from './gameLabels'
+import { GameStatus, oddsCells } from './gameLabels'
 import { SELECTED_STYLE } from './styles'
 import { useSelect } from './useSearchPatch'
 
@@ -71,10 +71,7 @@ export function Scoreboard({
               className={`${CARD} block w-full cursor-pointer text-left ${current ? SELECTED_STYLE : 'hover:border-slate-300'}`}
             >
               <span className={`${HEADER} font-medium whitespace-nowrap text-slate-500`}>
-                <span>{game.league}</span>
-                <span className={game.status === 'live' ? 'text-red-600' : undefined}>
-                  {statusLabel(game)}
-                </span>
+                <GameStatus game={game} />
               </span>
               <span className={TEAMS}>
                 <span className="truncate">{game.away.name}</span>

@@ -4,7 +4,7 @@ import type { EventId, GameId } from '#/domain/ids'
 import type { FeedStore } from '#/feed/store'
 import { selectGameDetail } from '#/feed/view'
 import { DetailPanel, MiniTimeline, RelatedList } from './DetailPanel'
-import { oddsCells, statusLabel } from './gameLabels'
+import { GameStatus, oddsCells } from './gameLabels'
 import { useSelect } from './useSearchPatch'
 
 export function GameDetailPanel({ store, selected }: { store: FeedStore; selected: GameId }) {
@@ -27,10 +27,7 @@ export function GameDetailPanel({ store, selected }: { store: FeedStore; selecte
       heading={
         <div>
           <p className="flex gap-2 text-xs font-medium text-slate-500">
-            <span>{game.league}</span>
-            <span className={game.status === 'live' ? 'text-red-600' : undefined}>
-              {statusLabel(game)}
-            </span>
+            <GameStatus game={game} />
           </p>
           <h2 className="text-lg font-semibold">{matchupLabel(game)}</h2>
         </div>

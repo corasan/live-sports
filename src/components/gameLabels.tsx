@@ -1,6 +1,6 @@
 import { PERIOD_PREFIX, type Game } from '#/domain/game'
 
-export function statusLabel(game: Game): string {
+function statusLabel(game: Game): string {
   switch (game.status) {
     case 'scheduled':
       return 'Scheduled'
@@ -9,6 +9,17 @@ export function statusLabel(game: Game): string {
     case 'final':
       return 'Final'
   }
+}
+
+export function GameStatus({ game }: { game: Game }) {
+  return (
+    <>
+      <span>{game.league}</span>
+      <span className={game.status === 'live' ? 'text-red-600' : undefined}>
+        {statusLabel(game)}
+      </span>
+    </>
+  )
 }
 
 function signed(value: number): string {
